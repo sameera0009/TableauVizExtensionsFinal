@@ -1,7 +1,7 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 
 import BalanceExplorer    from "./extensions/BalanceExplorer/BalanceExplorer.jsx";
-import Kpicardwithtrend    from "./extensions/clearing/kpicardwithtrend.jsx";
+import Kpiwithtrend    from "./extensions/clearing/kpiwithtrend.jsx";
 
 import "./App.css";
 
@@ -11,7 +11,7 @@ function App() {
       <Routes>
         
         <Route path="/balance-explorer"     element={<BalanceExplorer />} />
-        <Route path="/kpicardwithtrend"     element={<Kpicardwithtrend />} />
+        <Route path="/kpiwithtrend"     element={<Kpiwithtrend />} />
         
         <Route path="/"                     element={<Home />} />
         <Route path="*"                     element={<NotFound />} />
