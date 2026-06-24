@@ -1,12 +1,7 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import SuspenseCard       from "./extensions/SuspenseCard/SuspenseCard.jsx";
-import KpiCard            from "./extensions/KpiCard/KpiCard.jsx";
-import ChannelDonut       from "./extensions/ChannelDonut/ChannelDonut.jsx";
+
 import BalanceExplorer    from "./extensions/BalanceExplorer/BalanceExplorer.jsx";
-import CashPositionNavbar from "./extensions/CashPositionNavbar/CashPositionNavbar.jsx";
-import TreasuryKpi        from "./extensions/TreasuryKpi/TreasuryKpi.jsx";
-import ChequeMaterialKpi  from "./extensions/ChequeMaterialKpi/ChequeMaterialKpi.jsx";
-import PercentTrendKpi    from "./extensions/PercentTrendKpi/PercentTrendKpi.jsx";
+
 import "./App.css";
 
 function App() {
