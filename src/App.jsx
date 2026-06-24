@@ -11,7 +11,7 @@ function App() {
       <Routes>
         
         <Route path="/balance-explorer"     element={<BalanceExplorer />} />
-        <Route path="/kpicardwithtrend"     element={<kpicardwithtrend />} />
+        <Route path="/kpicardwithtrend"     element={<Kpicardwithtrend />} />
         
         <Route path="/"                     element={<Home />} />
         <Route path="*"                     element={<NotFound />} />
