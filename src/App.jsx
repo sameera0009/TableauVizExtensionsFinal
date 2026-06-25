@@ -3,7 +3,7 @@ import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 // Import your existing extensions
 import BalanceExplorer from "./extensions/BalanceExplorer/BalanceExplorer.jsx";
 import Kpiwithtrend from "./extensions/clearing/kpiwithtrend.jsx";
-import Kpiwithtrend from "./extensions/clearing/Ccashkpimain1.jsx";
+import Kpiwithtrend from "./extensions/Ccashkpimain1.jsx";
 
 // Import pages
 import Home from "./pages/Home.jsx";
