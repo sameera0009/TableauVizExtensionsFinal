@@ -5,6 +5,7 @@ function Home() {
   const [formStatus, setFormStatus] = useState('');
   const [visibleCards, setVisibleCards] = useState([]);
   const [imgError, setImgError] = useState({});
+  const [heroImgError, setHeroImgError] = useState(false);
 
   const extensions = [
     {
@@ -246,14 +247,14 @@ function Home() {
       <header id="top" className="hero">
         <div className="hero-grid">
           <div className="hero-copy">
-            <span className="eyebrow">Tableau Viz Extensions · Built for excellence</span>
+            <span className="eyebrow">Tableau Viz Extensions · Built for banking</span>
             <h1 className="hero-title">
               Instrument-grade visuals,<br />
               <span className="hero-title-accent">native to your dashboard.</span>
             </h1>
             <p className="hero-sub">
               Drop-in extensions that turn raw measures into KPI cards, gauges and
-              live monitors — engineered in production environments, not
+              live monitors — engineered in production banking environments, not
               theme-shop demos.
             </p>
             <div className="hero-actions">
@@ -268,7 +269,15 @@ function Home() {
             </div>
           </div>
 
-          {/* Signature: a live monitor panel that is itself an example output */}
+          {/* Signature: hero image when present, live monitor panel as fallback */}
+          {!heroImgError ? (
+            <img
+              src="/hero.png"
+              alt="DataVizLabs extension in a Tableau dashboard"
+              className="hero-img"
+              onError={() => setHeroImgError(true)}
+            />
+          ) : (
           <div className="monitor" aria-label="Example extension output">
             <div className="monitor-head">
               <span className="monitor-title">SUSPENSE MONITOR</span>
@@ -299,6 +308,7 @@ function Home() {
               </div>
             </div>
           </div>
+          )}
         </div>
       </header>
 
@@ -378,11 +388,12 @@ function Home() {
             <h2 className="h2">Built where the data is real.</h2>
             <p className="about-text">
               Every extension here started life solving an actual reporting problem
-              . They’re designed to behave well under load, install as a single
+              inside a bank — suspense reconciliation, cash positioning, treasury
+              limits. They’re designed to behave well under load, install as a single
               file, and stay out of your way once they’re running.
             </p>
             <ul className="about-list">
-              <li><strong>Production-tested.</strong> Shipped against live  dashboards, not sample superstore data.</li>
+              <li><strong>Production-tested.</strong> Shipped against live banking dashboards, not sample superstore data.</li>
               <li><strong>Self-contained.</strong> One file per extension. No build step on your side, no surprise dependencies.</li>
               <li><strong>Supported.</strong> Direct line to the person who built them — usually same-day.</li>
             </ul>
@@ -544,11 +555,6 @@ function Home() {
           height: 30px; width: auto; display: block;
           background: #fff; border-radius: 8px; padding: 4px 8px;
         }
-        .brand-name {
-          font-family: var(--display); font-weight: 600; font-size: 1.18rem;
-          letter-spacing: -0.01em; color: var(--text);
-        }
-        .brand-accent { color: var(--teal); }
         .nav-links { display: none; align-items: center; gap: 1.6rem; }
         @media (min-width: 860px) { .nav-links { display: flex; } }
         .nav-link {
@@ -608,6 +614,11 @@ function Home() {
         .btn-block { width: 100%; justify-content: center; }
 
         /* Monitor (signature) */
+        .hero-img {
+          width: 100%; height: auto; display: block; border-radius: 16px;
+          border: 1px solid var(--line-bright);
+          box-shadow: 0 30px 80px -40px rgba(0,0,0,0.8);
+        }
         .monitor {
           background: linear-gradient(180deg, var(--surface), var(--bg-2));
           border: 1px solid var(--line-bright); border-radius: 16px;
@@ -794,7 +805,6 @@ function Home() {
         .foot { border-top: 1px solid var(--line); padding: 2rem 0; }
         .foot-inner { display: flex; flex-direction: column; gap: 0.6rem; align-items: center; text-align: center; }
         @media (min-width: 700px) { .foot-inner { flex-direction: row; justify-content: space-between; text-align: left; } }
-        .foot-brand { font-size: 1.05rem; }
         .foot-text { font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.05em; color: var(--text-dim); }
 
         @media (prefers-reduced-motion: reduce) {
