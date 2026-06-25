@@ -230,8 +230,17 @@ function Home() {
       {/* Navigation */}
       <nav className="nav">
         <div className="nav-inner">
-          <a href="#top" className="brand" aria-label="DataVizLabs — home">
-            <img src="/logo.png" alt="DataVizLabs" className="brand-logo" />
+          <a href="/" className="brand" aria-label="DataVizLabs home">
+            <svg className="logo-mark" viewBox="0 0 48 48" role="img" aria-label="DataVizLabs logo">
+              <polygon points="22,10 7,40 22,40" className="lg-face-l" />
+              <polygon points="22,10 22,40 37,40" className="lg-face-r" />
+              <polygon points="22,10 7,40 37,40" className="lg-edge" />
+              <line x1="22" y1="10" x2="22" y2="40" className="lg-ridge" />
+              <polyline points="20,34 27,27 31,31 38,19 44,13" className="lg-trend" />
+              <polyline points="39,12 44,13 43,18" className="lg-arrow" />
+              <circle cx="44" cy="13" r="2" className="lg-tip" />
+            </svg>
+            <span className="logo-word">DataViz<span className="logo-word-accent">Labs</span></span>
           </a>
           <div className="nav-links">
             <a href="#extensions" className="nav-link">Extensions</a>
@@ -247,14 +256,14 @@ function Home() {
       <header id="top" className="hero">
         <div className="hero-grid">
           <div className="hero-copy">
-            <span className="eyebrow">Tableau Viz Extensions · Built for banking</span>
+            <span className="eyebrow">Tableau Viz Extensions · Built for excellence</span>
             <h1 className="hero-title">
               Instrument-grade visuals,<br />
               <span className="hero-title-accent">native to your dashboard.</span>
             </h1>
             <p className="hero-sub">
               Drop-in extensions that turn raw measures into KPI cards, gauges and
-              live monitors — engineered in production banking environments, not
+              live monitors — engineered in production environments, not
               theme-shop demos.
             </p>
             <div className="hero-actions">
@@ -334,14 +343,14 @@ function Home() {
         <div className="wrap">
           <div className="ext-head">
             <div>
-              <span className="eyebrow">The catalogue</span>
+              <span className="eyebrow">Featured</span>
               <h2 className="h2">Extensions</h2>
             </div>
-            <a href="/extensions" className="link-arrow">View all →</a>
+            <a href="/extensions" className="link-arrow">Full gallery →</a>
           </div>
 
           <div className="ext-grid">
-            {extensions.map((ext, index) => (
+            {extensions.slice(0, 3).map((ext, index) => (
               <article
                 key={ext.id}
                 className={`card ${visibleCards.includes(index) ? 'is-in' : ''}`}
@@ -377,6 +386,11 @@ function Home() {
               </article>
             ))}
           </div>
+
+          <a href="/extensions" className="ext-more">
+            <span className="ext-more-text">View all 8 extensions</span>
+            <span className="ext-more-arrow" aria-hidden="true">→</span>
+          </a>
         </div>
       </section>
 
@@ -467,7 +481,18 @@ function Home() {
       {/* Footer */}
       <footer className="foot">
         <div className="wrap foot-inner">
-          <img src="/logo.png" alt="DataVizLabs" className="foot-logo" />
+          <a href="/" className="brand foot-brand" aria-label="DataVizLabs home">
+            <svg className="logo-mark" viewBox="0 0 48 48" role="img" aria-label="DataVizLabs logo">
+              <polygon points="22,10 7,40 22,40" className="lg-face-l" />
+              <polygon points="22,10 22,40 37,40" className="lg-face-r" />
+              <polygon points="22,10 7,40 37,40" className="lg-edge" />
+              <line x1="22" y1="10" x2="22" y2="40" className="lg-ridge" />
+              <polyline points="20,34 27,27 31,31 38,19 44,13" className="lg-trend" />
+              <polyline points="39,12 44,13 43,18" className="lg-arrow" />
+              <circle cx="44" cy="13" r="2" className="lg-tip" />
+            </svg>
+            <span className="logo-word">DataViz<span className="logo-word-accent">Labs</span></span>
+          </a>
           <span className="foot-text">© {new Date().getFullYear()} DataVizLabs · Premium Tableau visualization extensions</span>
         </div>
       </footer>
@@ -505,6 +530,10 @@ function Home() {
           outline-offset: 2px;
           border-radius: 4px;
         }
+        :global(html) { scroll-behavior: smooth; }
+        :global(body) { margin: 0; display: block; overflow-x: hidden; overflow-y: auto; }
+        :global(#root) { width: 100%; min-height: 100vh; }
+
         .wrap { max-width: 1180px; margin: 0 auto; padding: 0 1.5rem; }
 
         .eyebrow {
@@ -546,15 +575,21 @@ function Home() {
           max-width: 1180px; margin: 0 auto; padding: 0 1.5rem;
           height: 62px; display: flex; align-items: center; justify-content: space-between;
         }
-        .brand { display: flex; align-items: center; text-decoration: none; }
-        .brand-logo {
-          height: 36px; width: auto; display: block;
-          background: #fff; border-radius: 8px; padding: 5px 9px;
+        .brand { display: flex; align-items: center; gap: 0.55rem; text-decoration: none; }
+        .logo-mark { width: 34px; height: 34px; display: block; flex: none; }
+        .lg-face-l { fill: var(--teal); fill-opacity: 0.20; }
+        .lg-face-r { fill: var(--teal); fill-opacity: 0.42; }
+        .lg-edge { fill: none; stroke: var(--teal); stroke-width: 1.6; stroke-linejoin: round; }
+        .lg-ridge { stroke: var(--teal); stroke-width: 1; stroke-opacity: 0.55; }
+        .lg-trend, .lg-arrow { fill: none; stroke: #6ff0e1; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+        .lg-tip { fill: var(--gold); }
+        .logo-word {
+          font-family: var(--display); font-weight: 700; font-size: 1.16rem;
+          letter-spacing: -0.01em; color: var(--text);
         }
-        .foot-logo {
-          height: 30px; width: auto; display: block;
-          background: #fff; border-radius: 8px; padding: 4px 8px;
-        }
+        .logo-word-accent { color: var(--teal); }
+        .foot-brand .logo-mark { width: 28px; height: 28px; }
+        .foot-brand .logo-word { font-size: 1.04rem; }
         .nav-links { display: none; align-items: center; gap: 1.6rem; }
         @media (min-width: 860px) { .nav-links { display: flex; } }
         .nav-link {
@@ -672,6 +707,20 @@ function Home() {
         }
         .link-arrow { font-family: var(--mono); font-size: 0.8rem; color: var(--teal); text-decoration: none; white-space: nowrap; }
         .link-arrow:hover { color: #6ff0e1; }
+        .ext-more {
+          margin-top: 1.6rem; display: flex; align-items: center; justify-content: center;
+          gap: 0.7rem; width: 100%; padding: 1.05rem 1.5rem;
+          background: var(--surface); border: 1px solid var(--line);
+          border-radius: 14px; text-decoration: none; color: var(--text);
+          font-family: var(--display); font-weight: 600; font-size: 1.02rem;
+          transition: border-color 0.25s, background 0.25s;
+        }
+        .ext-more:hover { border-color: var(--teal); background: var(--surface-2); }
+        .ext-more-arrow {
+          font-family: var(--mono); color: var(--teal); font-size: 1.2rem;
+          transition: transform 0.25s;
+        }
+        .ext-more:hover .ext-more-arrow { transform: translateX(5px); }
         .ext-grid {
           display: grid; grid-template-columns: 1fr; gap: 1.4rem;
         }
