@@ -1,21 +1,5 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { useState, useEffect } from "react";
-import { 
-  FaWhatsapp, 
-  FaLinkedin, 
-  FaFacebook, 
-  FaYoutube, 
-  FaDownload,
-  FaEnvelope,
-  FaPhone,
-  FaMapMarkerAlt,
-  FaChartBar,
-  FaClock,
-  FaUserCheck,
-  FaArrowRight
-} from 'react-icons/fa';
-import { HiOutlineMail, HiOutlineUser } from 'react-icons/hi';
-import { MdMessage } from 'react-icons/md';
 
 // Import your existing extensions
 import BalanceExplorer from "./extensions/BalanceExplorer/BalanceExplorer.jsx";
@@ -199,7 +183,7 @@ function Home() {
       <nav className="navbar">
         <div className="nav-content">
           <div className="nav-logo">
-            <FaChartBar className="logo-icon" />
+            <span className="logo-icon">📊</span>
             <span className="logo-text">DataVizLabs</span>
           </div>
           <div className="nav-links">
@@ -207,7 +191,7 @@ function Home() {
             <a href="#about" className="nav-link">About</a>
             <a href="#contact" className="nav-link">Contact</a>
             <button onClick={handleWhatsApp} className="whatsapp-btn">
-              <FaWhatsapp /> WhatsApp
+              💬 WhatsApp
             </button>
           </div>
         </div>
@@ -227,7 +211,7 @@ function Home() {
               Explore Extensions
             </a>
             <button onClick={handleWhatsApp} className="btn-whatsapp">
-              <FaWhatsapp /> Contact Sales
+              💬 Contact Sales
             </button>
           </div>
         </div>
@@ -276,14 +260,14 @@ function Home() {
                   <div className="card-actions">
                     <div className="card-buttons">
                       <a href={ext.videoUrl} target="_blank" rel="noopener noreferrer" className="btn-demo">
-                        <FaYoutube /> Watch Demo
+                        ▶ Watch Demo
                       </a>
                       <a href={ext.downloadUrl} className="btn-download">
-                        <FaDownload /> Download
+                        ⬇ Download
                       </a>
                     </div>
                     <a href={ext.route} className="btn-open">
-                      Open <FaArrowRight className="arrow-icon" />
+                      Open →
                     </a>
                   </div>
                 </div>
@@ -304,14 +288,14 @@ function Home() {
               </p>
               <div className="about-features">
                 <div className="feature-item">
-                  <FaUserCheck className="feature-icon" />
+                  <span className="feature-icon">👥</span>
                   <div>
                     <h4 className="feature-title">Expert Team</h4>
                     <p className="feature-description">Industry professionals with 10+ years of experience</p>
                   </div>
                 </div>
                 <div className="feature-item">
-                  <FaClock className="feature-icon" />
+                  <span className="feature-icon">🕐</span>
                   <div>
                     <h4 className="feature-title">24/7 Support</h4>
                     <p className="feature-description">Dedicated support team always ready to help</p>
@@ -353,7 +337,7 @@ function Home() {
                 <div className="form-group">
                   <label className="form-label">Your Name</label>
                   <div className="input-wrapper">
-                    <HiOutlineUser className="input-icon" />
+                    <span className="input-icon">👤</span>
                     <input
                       type="text"
                       name="name"
@@ -368,7 +352,7 @@ function Home() {
                 <div className="form-group">
                   <label className="form-label">Email Address</label>
                   <div className="input-wrapper">
-                    <HiOutlineMail className="input-icon" />
+                    <span className="input-icon">✉</span>
                     <input
                       type="email"
                       name="email"
@@ -383,7 +367,7 @@ function Home() {
                 <div className="form-group">
                   <label className="form-label">Message</label>
                   <div className="input-wrapper">
-                    <MdMessage className="input-icon" />
+                    <span className="input-icon">💬</span>
                     <textarea
                       name="message"
                       value={formData.message}
@@ -409,28 +393,28 @@ function Home() {
                 <h3 className="info-title">Contact Information</h3>
                 <div className="info-items">
                   <div className="info-item">
-                    <FaWhatsapp className="info-icon whatsapp" />
+                    <span className="info-icon whatsapp">💬</span>
                     <div>
                       <p className="info-label">WhatsApp</p>
                       <p className="info-value">+94 76 666 83434</p>
                     </div>
                   </div>
                   <div className="info-item">
-                    <FaEnvelope className="info-icon email" />
+                    <span className="info-icon email">✉</span>
                     <div>
                       <p className="info-label">Email</p>
                       <p className="info-value">contact@datavizlabs.com</p>
                     </div>
                   </div>
                   <div className="info-item">
-                    <FaPhone className="info-icon phone" />
+                    <span className="info-icon phone">📞</span>
                     <div>
                       <p className="info-label">Phone</p>
                       <p className="info-value">+94 76 666 83434</p>
                     </div>
                   </div>
                   <div className="info-item">
-                    <FaMapMarkerAlt className="info-icon location" />
+                    <span className="info-icon location">📍</span>
                     <div>
                       <p className="info-label">Location</p>
                       <p className="info-value">Colombo, Sri Lanka</p>
@@ -442,18 +426,10 @@ function Home() {
               <div className="social-card">
                 <h3 className="info-title">Follow Us</h3>
                 <div className="social-links">
-                  <a href="#" className="social-link linkedin">
-                    <FaLinkedin />
-                  </a>
-                  <a href="#" className="social-link facebook">
-                    <FaFacebook />
-                  </a>
-                  <a href="#" className="social-link youtube">
-                    <FaYoutube />
-                  </a>
-                  <button onClick={handleWhatsApp} className="social-link whatsapp-social">
-                    <FaWhatsapp />
-                  </button>
+                  <a href="#" className="social-link linkedin">in</a>
+                  <a href="#" className="social-link facebook">f</a>
+                  <a href="#" className="social-link youtube">▶</a>
+                  <button onClick={handleWhatsApp} className="social-link whatsapp-social">💬</button>
                 </div>
               </div>
             </div>
@@ -465,7 +441,7 @@ function Home() {
       <footer className="footer">
         <div className="footer-content">
           <div className="footer-logo">
-            <FaChartBar className="footer-logo-icon" />
+            <span className="footer-logo-icon">📊</span>
             <span className="footer-logo-text">DataVizLabs</span>
           </div>
           <p className="footer-text">© {new Date().getFullYear()} DataVizLabs. All rights reserved.</p>
@@ -511,7 +487,6 @@ function Home() {
 
         .logo-icon {
           font-size: 1.75rem;
-          color: #60a5fa;
         }
 
         .logo-text {
@@ -842,19 +817,12 @@ function Home() {
         .btn-open {
           color: #a78bfa;
           text-decoration: none;
-          display: flex;
-          align-items: center;
-          gap: 0.25rem;
           font-size: 0.875rem;
           transition: color 0.3s;
         }
 
         .btn-open:hover {
           color: #c4b5fd;
-        }
-
-        .arrow-icon {
-          font-size: 0.75rem;
         }
 
         /* About Section */
@@ -897,9 +865,6 @@ function Home() {
           font-size: 1.25rem;
           margin-top: 0.25rem;
         }
-
-        .feature-item:nth-child(1) .feature-icon { color: #60a5fa; }
-        .feature-item:nth-child(2) .feature-icon { color: #a78bfa; }
 
         .feature-title {
           font-weight: 600;
@@ -1092,14 +1057,19 @@ function Home() {
         }
 
         .social-link {
-          padding: 0.75rem;
+          width: 3rem;
+          height: 3rem;
           border-radius: 9999px;
           transition: all 0.3s;
           display: inline-flex;
+          align-items: center;
+          justify-content: center;
           color: white;
           text-decoration: none;
           border: none;
           cursor: pointer;
+          font-weight: bold;
+          font-size: 1.25rem;
         }
 
         .social-link:hover {
@@ -1137,7 +1107,6 @@ function Home() {
         }
 
         .footer-logo-icon {
-          color: #60a5fa;
           font-size: 1.25rem;
         }
 
