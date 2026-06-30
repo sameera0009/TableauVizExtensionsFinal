@@ -4,6 +4,7 @@ import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import BalanceExplorer from "./extensions/BalanceExplorer/BalanceExplorer.jsx";
 import Kpiwithtrend from "./extensions/clearing/kpiwithtrend.jsx";
 import Ccashkpimain1 from "./extensions/Ccashkpimain1/Ccashkpimain1.jsx";
+import Topkpibar from "./extensions/clearing/Topkpibar.jsx";
 
 // Import pages
 import Home from "./pages/Home.jsx";
@@ -18,6 +19,7 @@ function App() {
         {/* Your existing extension routes */}
         <Route path="/balance-explorer" element={<BalanceExplorer />} />
         <Route path="/kpiwithtrend" element={<Kpiwithtrend />} />
+        <Route path="/Topkpibar" element={<Topkpibar />} />
         <Route path="/suspense-card" element={<ExtensionPlaceholder title="Suspense KPI Card" />} />
         <Route path="/kpi-card" element={<ExtensionPlaceholder title="KPI Card Pro" />} />
         <Route path="/channel-donut" element={<ExtensionPlaceholder title="Channel Donut" />} />
