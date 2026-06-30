@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 
 /* ═══════════════════════════════════════════════════════════
    KPI BAR — single-file React Viz Extension
-   5 cards: Card 1 & 2 cheque-style, Card 3,4,5 percent-trend.
+   5 equal cards: Card 1 & 2 cheque-style, Card 3,4,5 percent-trend.
    All fields dropped on Detail, matched by calculated-field NAME.
 
    Field names:
@@ -27,7 +27,7 @@ const C = {
   red: "#c8102e", redGlow: "rgba(200,16,46,.10)",
   green: "#16a34a", greenGlow: "rgba(22,163,74,.10)",
   teal: "#0d9488", tealLt: "#14b8a6", tealDk: "#0f766e",
-  white: "#ffffff", chequeBg: "#f8f9fb", chequeBd: "#e2e6ed",
+  white: "#ffffff", chequeBd: "#e8ebf0",
 };
 
 /* ── format ── */
@@ -77,29 +77,17 @@ async function readRows(ws) {
   return rows;
 }
 
-/* STRICT key match: exact name, or normalized exact. NO loose "contains"
-   (that was picking trend3_value for trend3_count). */
+/* STRICT key match: exact, wrapper-stripped exact, normalized exact only */
 function norm(s) { return s.toLowerCase().replace(/[^a-z0-9]/g, ""); }
+function inner(c) { return c.replace(/^(SUM|AVG|MIN|MAX|COUNT|ATTR|MEDIAN|STDEV|VAR)\((.+)\)$/i, "$2"); }
 function keyFor(rows, name) {
   if (!rows.length) return null;
   const rk = Object.keys(rows[0]);
-  const lc = name.toLowerCase();
-  const nm = norm(name);
-  // 1. exact
-  let k = rk.find((c) => c.toLowerCase() === lc);
-  if (k) return k;
-  // 2. strip SUM()/AGG() wrapper then exact
-  k = rk.find((c) => {
-    const inner = c.toLowerCase().replace(/^(sum|avg|min|max|count|attr)\((.+)\)$/i, "$2");
-    return inner === lc;
-  });
-  if (k) return k;
-  // 3. normalized exact (handles spaces vs underscores, wrapper removed)
-  k = rk.find((c) => {
-    const inner = c.replace(/^(SUM|AVG|MIN|MAX|COUNT|ATTR)\((.+)\)$/i, "$2");
-    return norm(inner) === nm;
-  });
-  return k || null;
+  const lc = name.toLowerCase(), nm = norm(name);
+  let k = rk.find((c) => c.toLowerCase() === lc); if (k) return k;
+  k = rk.find((c) => inner(c).toLowerCase() === lc); if (k) return k;
+  k = rk.find((c) => norm(inner(c)) === nm); if (k) return k;
+  return null;
 }
 function vStr(row, k) {
   if (!k || !row || !row[k]) return null;
@@ -186,19 +174,17 @@ function Shell({ children }) {
 }
 
 /* ════════════════════════════════
-   BAR — responsive, no header, compact
+   BAR
 ════════════════════════════════ */
 function Bar({ rows }) {
   const [open, setOpen] = useState(true);
   const wrapRef = useRef(null);
   const [narrow, setNarrow] = useState(false);
 
-  /* responsive: watch container width, switch to wrap/scroll when tight */
   useEffect(() => {
     if (!wrapRef.current) return;
     const ro = new ResizeObserver((entries) => {
-      const w = entries[0].contentRect.width;
-      setNarrow(w < 620); // below this, cards wrap to a flexible grid
+      setNarrow(entries[0].contentRect.width < 620);
     });
     ro.observe(wrapRef.current);
     return () => ro.disconnect();
@@ -229,7 +215,6 @@ function Bar({ rows }) {
       const vals = rows.map((r) => vNum(r, hr)).filter((v) => v != null);
       if (vals.length) hero = vals.every((v) => Math.abs(v) <= 100) ? vals[vals.length - 1] : vals.reduce((a, b) => a + b, 0);
     }
-    /* count ONLY if a real, distinct count column exists and it's not the same column as value/hero */
     let count = null;
     if (ck && ck !== vk && ck !== hr) count = sumNum(rows, ck);
     let pts = [];
@@ -238,7 +223,7 @@ function Bar({ rows }) {
       pts.push({ val, lbl: dk ? dateLabel(r[dk]) : "", date: dk ? parseDate(r[dk]) : null });
     });
     if (pts.length && pts[0].date) pts.sort((a, b) => (a.date?.getTime() || 0) - (b.date?.getTime() || 0));
-    const seen = {}; pts = pts.filter((x) => { if (seen[x.lbl]) return false; seen[x.lbl] = true; return true; });
+    const seen = {}; pts = pts.filter((x) => { const key = x.lbl || x.val; if (seen[key]) return false; seen[key] = true; return true; });
     if (hero == null && pts.length) hero = pts[pts.length - 1].val;
     return { header, hero, count, pts, has: !!(hr || vk || hk) };
   };
@@ -252,11 +237,14 @@ function Bar({ rows }) {
   ];
   const anyData = cards.some((c) => c.data.has);
 
-  /* floating toggle, top-right, overlaid (no header row) */
   return (
-    <div ref={wrapRef} style={{ position:"relative", width:"100%", flex:1, minHeight:0, display:"flex", flexDirection:"column" }}>
-      <FloatToggle open={open} onClick={() => setOpen((v) => !v)} />
+    <div ref={wrapRef} style={{ width:"100%", flex:1, minHeight:0, display:"flex", flexDirection:"column", gap:6 }}>
+      {/* toggle row — separated above cards, right aligned */}
+      <div style={{ display:"flex", justifyContent:"flex-end", flexShrink:0 }}>
+        <IconToggle open={open} onClick={() => setOpen((v) => !v)} />
+      </div>
 
+      {/* card row */}
       <div style={{
         display:"flex",
         flexWrap: narrow ? "wrap" : "nowrap",
@@ -266,7 +254,7 @@ function Bar({ rows }) {
         transform: open ? "translateY(0)" : "translateY(-6px)",
         overflow:"hidden",
         transition:"max-height .4s cubic-bezier(.4,0,.2,1),opacity .28s,transform .32s",
-        alignContent:"flex-start",
+        alignItems:"stretch",
       }}>
         {!anyData
           ? <EmptyHint />
@@ -274,6 +262,7 @@ function Bar({ rows }) {
               <div key={i} style={{
                 flex: narrow ? "1 1 calc(50% - 4px)" : "1 1 0",
                 minWidth: narrow ? 140 : 0,
+                display:"flex",
                 animation:`kbIn .45s cubic-bezier(.16,1,.3,1) ${i * 0.05}s both`,
               }}>
                 {c.type === "cheque" ? <ChequeCard d={c.data} /> : <TrendCard d={c.data} />}
@@ -285,35 +274,34 @@ function Bar({ rows }) {
   );
 }
 
-/* ── floating show/hide button ── */
-function FloatToggle({ open, onClick }) {
+/* ── icon-only show/hide button (no text) ── */
+function IconToggle({ open, onClick }) {
   const [hov, setHov] = useState(false);
   return (
     <button
       onClick={onClick}
+      title={open ? "Hide" : "Show"}
       onMouseEnter={() => setHov(true)}
       onMouseLeave={() => setHov(false)}
       style={{
-        position:"absolute", top:-2, right:0, zIndex:20,
-        display:"flex", alignItems:"center", gap:5, height:24, padding:"0 9px 0 7px",
-        borderRadius:7, cursor:"pointer", outline:"none",
+        display:"flex", alignItems:"center", justifyContent:"center",
+        width:26, height:26, borderRadius:7, cursor:"pointer", outline:"none", padding:0,
         border:"1px solid " + (hov ? "rgba(13,148,136,.4)" : C.line),
-        background: hov ? "rgba(13,148,136,.10)" : "rgba(255,255,255,.85)",
-        backdropFilter:"blur(8px)", color: hov ? C.tealDk : C.sub, fontFamily:"inherit",
-        fontSize:10.5, fontWeight:600, transition:"all .2s", boxShadow: hov ? "0 2px 10px rgba(13,148,136,.15)" : "0 1px 3px rgba(15,28,46,.06)",
+        background: hov ? "rgba(13,148,136,.10)" : "rgba(255,255,255,.9)",
+        color: hov ? C.tealDk : C.sub, transition:"all .2s",
+        boxShadow: hov ? "0 2px 10px rgba(13,148,136,.15)" : "0 1px 3px rgba(15,28,46,.06)",
       }}
     >
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
            style={{ transform: open ? "rotate(0deg)" : "rotate(-90deg)", transition:"transform .35s cubic-bezier(.4,0,.2,1)" }}>
         <polyline points="6 9 12 15 18 9" />
       </svg>
-      {open ? "Hide" : "Show"}
     </button>
   );
 }
 
 /* ════════════════════════════════
-   CHEQUE CARD — compact, no fixed height
+   CHEQUE CARD — pure white, equal size
 ════════════════════════════════ */
 function ChequeCard({ d }) {
   const { headline, amount, count, lw, mom, has } = d;
@@ -332,11 +320,10 @@ function ChequeCard({ d }) {
 
   return (
     <div style={{
-      position:"relative", boxSizing:"border-box",
-      background:`radial-gradient(ellipse at 30% 15%, rgba(200,16,46,.025), transparent 60%), ${C.chequeBg}`,
-      borderRadius:12, border:`0.5px solid ${C.chequeBd}`,
-      boxShadow:"0 1px 4px rgba(15,28,46,.05), inset 0 1px 0 rgba(255,255,255,.8)",
-      padding:"11px 12px 10px", overflow:"hidden",
+      width:"100%", boxSizing:"border-box", background:C.white,
+      borderRadius:12, border:`1px solid ${C.chequeBd}`,
+      boxShadow:"0 1px 3px rgba(15,28,46,.05)",
+      padding:"12px 13px 11px", overflow:"hidden", display:"flex", flexDirection:"column",
     }}>
       <div style={{ fontSize:9, fontWeight:700, letterSpacing:".06em", textTransform:"uppercase", color:C.mut, marginBottom:5, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{headline}</div>
 
@@ -350,7 +337,7 @@ function ChequeCard({ d }) {
         <span style={{ fontSize:8, color:C.mut, marginLeft:"auto" }}>Count</span>
       </div>
 
-      <div style={{ display:"flex", flexDirection:"column", gap:4 }}>
+      <div style={{ display:"flex", flexDirection:"column", gap:4, marginTop:"auto" }}>
         <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
           <span style={{ fontSize:9.5, color:C.sub }}>vs Last Week</span>
           <span style={{ display:"flex", alignItems:"center", gap:3, fontSize:11, fontWeight:700, color:lwColor }}>
@@ -370,40 +357,53 @@ function ChequeCard({ d }) {
 }
 
 /* ════════════════════════════════
-   TREND CARD — no top stripe, compact
+   TREND CARD — pure white, count on own row, line fixed
 ════════════════════════════════ */
 function TrendCard({ d }) {
   const { header, hero, count, pts, has } = d;
   const svgRef = useRef(null);
+  const valsKey = pts.map((p) => p.val).join(",");
 
   useEffect(() => {
-    if (!svgRef.current || pts.length < 2) return;
+    if (!svgRef.current) return;
     buildSpark(svgRef.current, pts.map((p) => p.val));
-  }, [pts.map((p) => p.val).join(",")]); // eslint-disable-line
+  }, [valsKey]); // eslint-disable-line
 
   if (!has) return <CardPlaceholder label="Trend card" sub="drop trendN_* fields" />;
 
   const first = pts[0]?.lbl || "", last = pts[pts.length - 1]?.lbl || "";
+  const hasLine = pts.length >= 2;
 
   return (
     <div style={{
-      position:"relative", boxSizing:"border-box", background:C.white,
-      borderRadius:12, border:"0.5px solid rgba(15,23,42,.06)", overflow:"hidden",
-      boxShadow:"0 1px 3px rgba(15,23,42,.04),0 4px 14px rgba(15,23,42,.05)",
+      width:"100%", boxSizing:"border-box", background:C.white,
+      borderRadius:12, border:`1px solid ${C.chequeBd}`, overflow:"hidden",
+      boxShadow:"0 1px 3px rgba(15,28,46,.05)",
       display:"flex", flexDirection:"column",
     }}>
-      <div style={{ padding:"11px 12px 0" }}>
-        <div style={{ fontSize:9, fontWeight:700, letterSpacing:".08em", textTransform:"uppercase", color:C.mut, marginBottom:6, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{header}</div>
-        <div style={{ display:"flex", alignItems:"baseline", gap:6 }}>
-          <span style={{ fontSize:25, fontWeight:700, color:C.ink, letterSpacing:"-.04em", lineHeight:1, fontVariantNumeric:"tabular-nums", fontFamily:"ui-monospace,SFMono-Regular,Menlo,monospace" }}>{fmtPct(hero)}</span>
-          {count != null && <span style={{ fontSize:11, fontWeight:600, color:C.teal, fontFamily:"ui-monospace,monospace" }}>{fmtCount(count)}</span>}
-        </div>
-        {count != null && <div style={{ fontSize:7.5, fontWeight:600, letterSpacing:".08em", textTransform:"uppercase", color:C.faint, marginTop:2 }}>Count</div>}
+      <div style={{ padding:"12px 13px 0" }}>
+        <div style={{ fontSize:9, fontWeight:700, letterSpacing:".06em", textTransform:"uppercase", color:C.mut, marginBottom:6, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{header}</div>
+
+        {/* hero on its own line */}
+        <div style={{ fontSize:25, fontWeight:700, color:C.ink, letterSpacing:"-.04em", lineHeight:1, fontVariantNumeric:"tabular-nums", fontFamily:"ui-monospace,SFMono-Regular,Menlo,monospace" }}>{fmtPct(hero)}</div>
+
+        {/* count on its OWN row below hero */}
+        {count != null && (
+          <div style={{ display:"flex", alignItems:"baseline", gap:5, marginTop:5 }}>
+            <span style={{ fontSize:12, fontWeight:700, color:C.teal, fontFamily:"ui-monospace,monospace" }}>{fmtCount(count)}</span>
+            <span style={{ fontSize:8, fontWeight:600, letterSpacing:".08em", textTransform:"uppercase", color:C.faint }}>Count</span>
+          </div>
+        )}
       </div>
-      <div style={{ padding:"6px 5px 0" }}>
-        <svg ref={svgRef} viewBox="0 0 240 44" preserveAspectRatio="none" style={{ width:"100%", height:40, display:"block", overflow:"visible" }} />
+
+      {/* trend line */}
+      <div style={{ padding:"8px 5px 0", marginTop:"auto" }}>
+        {hasLine
+          ? <svg ref={svgRef} viewBox="0 0 240 44" preserveAspectRatio="none" style={{ width:"100%", height:42, display:"block", overflow:"visible" }} />
+          : <div style={{ height:42, display:"flex", alignItems:"center", justifyContent:"center", fontSize:8, color:C.faint }}>drop {pretty(header).toLowerCase().includes("trend")?"":"trendN_"}value + date</div>
+        }
       </div>
-      <div style={{ display:"flex", justifyContent:"space-between", padding:"0 12px 9px" }}>
+      <div style={{ display:"flex", justifyContent:"space-between", padding:"2px 13px 9px" }}>
         <span style={{ fontSize:7, fontWeight:600, color:C.faint }}>{first}</span>
         <span style={{ fontSize:7, fontWeight:600, color:C.faint }}>{last}</span>
       </div>
@@ -412,8 +412,9 @@ function TrendCard({ d }) {
 }
 
 function buildSpark(svg, values) {
-  if (!svg || values.length < 2) return;
+  if (!svg) return;
   svg.innerHTML = "";
+  if (values.length < 2) return;
   const ns = "http://www.w3.org/2000/svg";
   const W = 240, H = 44, pad = 5;
   const min = Math.min(...values), max = Math.max(...values), rng = max - min || 1, n = values.length;
@@ -449,8 +450,8 @@ function buildSpark(svg, values) {
 ════════════════════════════════ */
 function CardPlaceholder({ label, sub }) {
   return (
-    <div style={{ boxSizing:"border-box", border:`1px dashed ${C.chequeBd}`, borderRadius:12, background:"rgba(248,249,251,.5)",
-                  display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:3, padding:"22px 10px", minHeight:110 }}>
+    <div style={{ width:"100%", boxSizing:"border-box", border:`1px solid ${C.chequeBd}`, borderRadius:12, background:C.white,
+                  display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:3, padding:"24px 10px", minHeight:120 }}>
       <span style={{ fontSize:9.5, fontWeight:600, color:C.mut }}>{label}</span>
       <span style={{ fontSize:8, color:C.faint, textAlign:"center" }}>{sub}</span>
     </div>
@@ -458,7 +459,7 @@ function CardPlaceholder({ label, sub }) {
 }
 function EmptyHint() {
   return (
-    <div style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center", border:`1px dashed ${C.chequeBd}`, borderRadius:12, background:"rgba(248,249,251,.5)", padding:16, minHeight:90 }}>
+    <div style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center", border:`1px solid ${C.chequeBd}`, borderRadius:12, background:C.white, padding:16, minHeight:100 }}>
       <span style={{ fontSize:10.5, color:C.mut, textAlign:"center", lineHeight:1.5 }}>
         Drop your calculated fields onto <b>Detail</b>.<br/>
         <span style={{ fontSize:8.5, color:C.faint }}>cheque1_* , cheque2_* , trend1_* , trend2_* , trend3_*</span>
@@ -470,7 +471,7 @@ function BarSkeleton() {
   return (
     <div style={{ width:"100%", display:"flex", gap:8 }}>
       {[0,1,2,3,4].map((i) => (
-        <div key={i} style={{ flex:1, height:120, borderRadius:12, background:"linear-gradient(90deg,#f1f5f9 25%,#e2e8f0 50%,#f1f5f9 75%)", backgroundSize:"200% 100%", animation:"kbShim 1.4s infinite" }} />
+        <div key={i} style={{ flex:1, height:130, borderRadius:12, background:"linear-gradient(90deg,#f1f5f9 25%,#e2e8f0 50%,#f1f5f9 75%)", backgroundSize:"200% 100%", animation:"kbShim 1.4s infinite" }} />
       ))}
     </div>
   );
