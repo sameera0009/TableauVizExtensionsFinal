@@ -2,21 +2,14 @@ import { useEffect, useRef, useState } from "react";
 
 /* ═══════════════════════════════════════════════════════════
    KPI BAR — single-file React Viz Extension
-   One bar containing 5 cards:
-     • Card 1 & 2  → Cheque-material style
-     • Card 3,4,5  → Percent-trend style (teal gradient line)
+   5 cards: Card 1 & 2 cheque-style, Card 3,4,5 percent-trend.
+   All fields dropped on Detail, matched by calculated-field NAME.
 
-   ALL fields are dropped onto the Marks "Detail" tile and resolved
-   by calculated-field NAME (no encodings → no 4-field limit).
-
-   Field names (create as calculated fields in Tableau):
+   Field names:
      cheque1_headline / cheque1_amount / cheque1_count / cheque1_var_lw / cheque1_var_mom
      cheque2_*  (same five)
      trend1_header / trend1_hero / trend1_count / trend1_value / trend1_date
-     trend2_*   (same five)
-     trend3_*   (same five)
-
-   One global show/hide collapses the whole bar.
+     trend2_* / trend3_*  (same five)
 ═══════════════════════════════════════════════════════════ */
 
 if (typeof window !== "undefined" && !document.getElementById("kb-kf")) {
@@ -24,11 +17,10 @@ if (typeof window !== "undefined" && !document.getElementById("kb-kf")) {
   s.id = "kb-kf";
   s.innerHTML =
     "@keyframes kbShim{0%{background-position:200% 0}100%{background-position:-200% 0}}" +
-    "@keyframes kbIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}";
+    "@keyframes kbIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}";
   document.head.appendChild(s);
 }
 
-/* ── palette ── */
 const C = {
   ink: "#0f1c2e", sub: "#4a5568", mut: "#8a96a8", faint: "#cbd5e1",
   line: "rgba(15,28,46,.08)",
@@ -84,15 +76,30 @@ async function readRows(ws) {
   await reader.releaseAsync();
   return rows;
 }
-/* find a column whose name matches the calc-field name (exact, then contains) */
+
+/* STRICT key match: exact name, or normalized exact. NO loose "contains"
+   (that was picking trend3_value for trend3_count). */
+function norm(s) { return s.toLowerCase().replace(/[^a-z0-9]/g, ""); }
 function keyFor(rows, name) {
   if (!rows.length) return null;
   const rk = Object.keys(rows[0]);
   const lc = name.toLowerCase();
-  return rk.find((k) => k.toLowerCase() === lc)
-      || rk.find((k) => k.toLowerCase().replace(/[^a-z0-9]/g, "") === lc.replace(/[^a-z0-9]/g, ""))
-      || rk.find((k) => k.toLowerCase().includes(lc))
-      || null;
+  const nm = norm(name);
+  // 1. exact
+  let k = rk.find((c) => c.toLowerCase() === lc);
+  if (k) return k;
+  // 2. strip SUM()/AGG() wrapper then exact
+  k = rk.find((c) => {
+    const inner = c.toLowerCase().replace(/^(sum|avg|min|max|count|attr)\((.+)\)$/i, "$2");
+    return inner === lc;
+  });
+  if (k) return k;
+  // 3. normalized exact (handles spaces vs underscores, wrapper removed)
+  k = rk.find((c) => {
+    const inner = c.replace(/^(SUM|AVG|MIN|MAX|COUNT|ATTR)\((.+)\)$/i, "$2");
+    return norm(inner) === nm;
+  });
+  return k || null;
 }
 function vStr(row, k) {
   if (!k || !row || !row[k]) return null;
@@ -115,7 +122,6 @@ function sumNum(rows, k) {
   return c ? s : null;
 }
 
-/* date helpers for the trend line */
 function parseDate(dv) {
   if (!dv) return null;
   const nv = dv.nativeValue ?? dv.value;
@@ -171,21 +177,33 @@ export default function KpiBar() {
 
 function Shell({ children }) {
   return (
-    <div style={{ width:"100%", height:"100%", background:"transparent", padding:"6px 8px",
+    <div style={{ width:"100%", height:"100%", background:"transparent", padding:6,
                   fontFamily:"system-ui,-apple-system,'Segoe UI',sans-serif", WebkitFontSmoothing:"antialiased",
-                  boxSizing:"border-box", overflow:"hidden" }}>
+                  boxSizing:"border-box", overflow:"hidden", display:"flex", flexDirection:"column" }}>
       {children}
     </div>
   );
 }
 
 /* ════════════════════════════════
-   BAR
+   BAR — responsive, no header, compact
 ════════════════════════════════ */
 function Bar({ rows }) {
   const [open, setOpen] = useState(true);
+  const wrapRef = useRef(null);
+  const [narrow, setNarrow] = useState(false);
 
-  /* build the 5 card data objects from named columns */
+  /* responsive: watch container width, switch to wrap/scroll when tight */
+  useEffect(() => {
+    if (!wrapRef.current) return;
+    const ro = new ResizeObserver((entries) => {
+      const w = entries[0].contentRect.width;
+      setNarrow(w < 620); // below this, cards wrap to a flexible grid
+    });
+    ro.observe(wrapRef.current);
+    return () => ro.disconnect();
+  }, []);
+
   const cheque = (p) => {
     const hk = keyFor(rows, p + "_headline");
     const ak = keyFor(rows, p + "_amount");
@@ -194,11 +212,8 @@ function Bar({ rows }) {
     const mk = keyFor(rows, p + "_var_mom");
     let headline = vStr(rows[0], hk);
     headline = headline ? pretty(headline) : pretty(p);
-    const amount = sumNum(rows, ak);
-    const count  = sumNum(rows, ck);
-    const lw  = vNum(rows[0], lk);
-    const mom = vNum(rows[0], mk);
-    return { headline, amount, count, lw, mom, has: !!(ak || hk) };
+    return { headline, amount: sumNum(rows, ak), count: sumNum(rows, ck),
+             lw: vNum(rows[0], lk), mom: vNum(rows[0], mk), has: !!(ak || hk || ck) };
   };
 
   const trend = (p) => {
@@ -209,21 +224,21 @@ function Bar({ rows }) {
     const dk = keyFor(rows, p + "_date");
     let header = vStr(rows[0], hk);
     header = header ? pretty(header) : pretty(p);
-    /* hero: if rate-like use latest, else sum */
     let hero = null;
     if (hr) {
       const vals = rows.map((r) => vNum(r, hr)).filter((v) => v != null);
       if (vals.length) hero = vals.every((v) => Math.abs(v) <= 100) ? vals[vals.length - 1] : vals.reduce((a, b) => a + b, 0);
     }
-    const count = sumNum(rows, ck);
-    /* series */
+    /* count ONLY if a real, distinct count column exists and it's not the same column as value/hero */
+    let count = null;
+    if (ck && ck !== vk && ck !== hr) count = sumNum(rows, ck);
     let pts = [];
     rows.forEach((r) => {
       const val = vNum(r, vk); if (val == null) return;
       pts.push({ val, lbl: dk ? dateLabel(r[dk]) : "", date: dk ? parseDate(r[dk]) : null });
     });
     if (pts.length && pts[0].date) pts.sort((a, b) => (a.date?.getTime() || 0) - (b.date?.getTime() || 0));
-    const seen = {}; pts = pts.filter((p) => { if (seen[p.lbl]) return false; seen[p.lbl] = true; return true; });
+    const seen = {}; pts = pts.filter((x) => { if (seen[x.lbl]) return false; seen[x.lbl] = true; return true; });
     if (hero == null && pts.length) hero = pts[pts.length - 1].val;
     return { header, hero, count, pts, has: !!(hr || vk || hk) };
   };
@@ -237,32 +252,31 @@ function Bar({ rows }) {
   ];
   const anyData = cards.some((c) => c.data.has);
 
+  /* floating toggle, top-right, overlaid (no header row) */
   return (
-    <div style={{ width:"100%", height:"100%", display:"flex", flexDirection:"column", gap:8, minHeight:0 }}>
-      {/* header strip with global toggle */}
-      <div style={{ display:"flex", alignItems:"center", gap:10, flexShrink:0 }}>
-        <div style={{ display:"flex", alignItems:"center", gap:7 }}>
-          <div style={{ width:3, height:16, borderRadius:2, background:`linear-gradient(180deg,${C.red},${C.teal})` }} />
-          <span style={{ fontSize:11.5, fontWeight:700, color:C.ink, letterSpacing:"-.1px" }}>Cash Position KPIs</span>
-          <span style={{ fontSize:9, fontWeight:600, color:C.mut, background:"rgba(15,28,46,.05)", padding:"2px 7px", borderRadius:99 }}>5 cards</span>
-        </div>
-        <div style={{ flex:1, height:1, background:"linear-gradient(90deg,rgba(15,28,46,.08),transparent)" }} />
-        <ToggleButton open={open} onClick={() => setOpen((v) => !v)} />
-      </div>
+    <div ref={wrapRef} style={{ position:"relative", width:"100%", flex:1, minHeight:0, display:"flex", flexDirection:"column" }}>
+      <FloatToggle open={open} onClick={() => setOpen((v) => !v)} />
 
-      {/* card row — collapsible */}
       <div style={{
-        display:"flex", gap:8, flex:1, minHeight:0,
-        maxHeight: open ? 400 : 0, opacity: open ? 1 : 0,
-        transform: open ? "translateY(0)" : "translateY(-8px)",
+        display:"flex",
+        flexWrap: narrow ? "wrap" : "nowrap",
+        gap:8,
+        maxHeight: open ? 600 : 0,
+        opacity: open ? 1 : 0,
+        transform: open ? "translateY(0)" : "translateY(-6px)",
         overflow:"hidden",
-        transition:"max-height .42s cubic-bezier(.4,0,.2,1),opacity .3s,transform .35s",
+        transition:"max-height .4s cubic-bezier(.4,0,.2,1),opacity .28s,transform .32s",
+        alignContent:"flex-start",
       }}>
         {!anyData
           ? <EmptyHint />
           : cards.map((c, i) => (
-              <div key={i} style={{ flex:1, minWidth:0, animation:`kbIn .5s cubic-bezier(.16,1,.3,1) ${i * 0.06}s both` }}>
-                {c.type === "cheque" ? <ChequeCard d={c.data} /> : <TrendCard d={c.data} idx={i} />}
+              <div key={i} style={{
+                flex: narrow ? "1 1 calc(50% - 4px)" : "1 1 0",
+                minWidth: narrow ? 140 : 0,
+                animation:`kbIn .45s cubic-bezier(.16,1,.3,1) ${i * 0.05}s both`,
+              }}>
+                {c.type === "cheque" ? <ChequeCard d={c.data} /> : <TrendCard d={c.data} />}
               </div>
             ))
         }
@@ -271,8 +285,8 @@ function Bar({ rows }) {
   );
 }
 
-/* ── enhanced show/hide button ── */
-function ToggleButton({ open, onClick }) {
+/* ── floating show/hide button ── */
+function FloatToggle({ open, onClick }) {
   const [hov, setHov] = useState(false);
   return (
     <button
@@ -280,27 +294,26 @@ function ToggleButton({ open, onClick }) {
       onMouseEnter={() => setHov(true)}
       onMouseLeave={() => setHov(false)}
       style={{
-        display:"flex", alignItems:"center", gap:6, height:28, padding:"0 12px 0 10px",
-        borderRadius:8, cursor:"pointer", outline:"none",
+        position:"absolute", top:-2, right:0, zIndex:20,
+        display:"flex", alignItems:"center", gap:5, height:24, padding:"0 9px 0 7px",
+        borderRadius:7, cursor:"pointer", outline:"none",
         border:"1px solid " + (hov ? "rgba(13,148,136,.4)" : C.line),
-        background: hov ? "rgba(13,148,136,.08)" : "rgba(255,255,255,.7)",
-        color: hov ? C.tealDk : C.sub, fontFamily:"inherit",
-        fontSize:11, fontWeight:600, transition:"all .2s", boxShadow: hov ? "0 2px 8px rgba(13,148,136,.12)" : "none",
+        background: hov ? "rgba(13,148,136,.10)" : "rgba(255,255,255,.85)",
+        backdropFilter:"blur(8px)", color: hov ? C.tealDk : C.sub, fontFamily:"inherit",
+        fontSize:10.5, fontWeight:600, transition:"all .2s", boxShadow: hov ? "0 2px 10px rgba(13,148,136,.15)" : "0 1px 3px rgba(15,28,46,.06)",
       }}
     >
-      <span style={{ position:"relative", width:14, height:14, display:"inline-flex", alignItems:"center", justifyContent:"center" }}>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"
-             style={{ transform: open ? "rotate(0deg)" : "rotate(-90deg)", transition:"transform .35s cubic-bezier(.4,0,.2,1)" }}>
-          <polyline points="6 9 12 15 18 9" />
-        </svg>
-      </span>
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+           style={{ transform: open ? "rotate(0deg)" : "rotate(-90deg)", transition:"transform .35s cubic-bezier(.4,0,.2,1)" }}>
+        <polyline points="6 9 12 15 18 9" />
+      </svg>
       {open ? "Hide" : "Show"}
     </button>
   );
 }
 
 /* ════════════════════════════════
-   CHEQUE CARD
+   CHEQUE CARD — compact, no fixed height
 ════════════════════════════════ */
 function ChequeCard({ d }) {
   const { headline, amount, count, lw, mom, has } = d;
@@ -312,44 +325,42 @@ function ChequeCard({ d }) {
   const momColor = momPos === true ? C.green : momPos === false ? C.red : C.mut;
 
   const Arrow = ({ up }) => (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
       <polyline points={up ? "18 15 12 9 6 15" : "6 9 12 15 18 9"} />
     </svg>
   );
 
   return (
     <div style={{
-      position:"relative", height:"100%", boxSizing:"border-box",
-      background:`radial-gradient(ellipse at 30% 15%, rgba(200,16,46,.03), transparent 60%), ${C.chequeBg}`,
-      borderRadius:14, border:`0.5px solid ${C.chequeBd}`,
-      boxShadow:"0 2px 8px rgba(15,28,46,.05), inset 0 1px 0 rgba(255,255,255,.8)",
-      padding:"13px 14px 11px", overflow:"hidden", display:"flex", flexDirection:"column",
+      position:"relative", boxSizing:"border-box",
+      background:`radial-gradient(ellipse at 30% 15%, rgba(200,16,46,.025), transparent 60%), ${C.chequeBg}`,
+      borderRadius:12, border:`0.5px solid ${C.chequeBd}`,
+      boxShadow:"0 1px 4px rgba(15,28,46,.05), inset 0 1px 0 rgba(255,255,255,.8)",
+      padding:"11px 12px 10px", overflow:"hidden",
     }}>
-      <div style={{ position:"absolute", top:0, left:14, right:14, height:2, background:`linear-gradient(90deg,${C.red},${C.ink} 60%,${C.red})`, opacity:.55 }} />
+      <div style={{ fontSize:9, fontWeight:700, letterSpacing:".06em", textTransform:"uppercase", color:C.mut, marginBottom:5, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{headline}</div>
 
-      <div style={{ fontSize:9.5, fontWeight:700, letterSpacing:".07em", textTransform:"uppercase", color:C.mut, marginBottom:6, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{headline}</div>
-
-      <div style={{ fontSize:26, fontWeight:700, color:C.ink, letterSpacing:"-.03em", lineHeight:1.05, fontVariantNumeric:"tabular-nums", fontFamily:"ui-monospace,SFMono-Regular,Menlo,monospace", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
+      <div style={{ fontSize:23, fontWeight:700, color:C.ink, letterSpacing:"-.03em", lineHeight:1.05, fontVariantNumeric:"tabular-nums", fontFamily:"ui-monospace,SFMono-Regular,Menlo,monospace", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
         {amount != null ? fmtN(amount) : "—"}
       </div>
 
-      <div style={{ display:"flex", alignItems:"center", gap:5, margin:"8px 0", padding:"4px 0", borderTop:`0.5px solid ${C.line}`, borderBottom:`0.5px solid ${C.line}` }}>
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={C.sub} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/></svg>
-        <span style={{ fontSize:11, fontWeight:600, color:C.sub }}>{count != null ? Math.round(count).toLocaleString() : "—"}</span>
-        <span style={{ fontSize:8.5, color:C.mut, marginLeft:"auto" }}>Count</span>
+      <div style={{ display:"flex", alignItems:"center", gap:5, margin:"7px 0", padding:"4px 0", borderTop:`0.5px solid ${C.line}`, borderBottom:`0.5px solid ${C.line}` }}>
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={C.sub} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/></svg>
+        <span style={{ fontSize:10.5, fontWeight:600, color:C.sub }}>{count != null ? Math.round(count).toLocaleString() : "—"}</span>
+        <span style={{ fontSize:8, color:C.mut, marginLeft:"auto" }}>Count</span>
       </div>
 
-      <div style={{ display:"flex", flexDirection:"column", gap:5, marginTop:"auto" }}>
+      <div style={{ display:"flex", flexDirection:"column", gap:4 }}>
         <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-          <span style={{ fontSize:10, color:C.sub }}>vs Last Week</span>
-          <span style={{ display:"flex", alignItems:"center", gap:3, fontSize:11.5, fontWeight:700, color:lwColor }}>
+          <span style={{ fontSize:9.5, color:C.sub }}>vs Last Week</span>
+          <span style={{ display:"flex", alignItems:"center", gap:3, fontSize:11, fontWeight:700, color:lwColor }}>
             {lw != null && <Arrow up={lwPos} />}{fmtSignPct(lw)}
           </span>
         </div>
         <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-          <span style={{ fontSize:10, color:C.sub }}>MoM</span>
-          <span style={{ display:"flex", alignItems:"center", gap:3, fontSize:11.5, fontWeight:700, color:momColor,
-                         padding:"1px 7px", borderRadius:10, background: momPos === true ? C.greenGlow : momPos === false ? C.redGlow : "transparent" }}>
+          <span style={{ fontSize:9.5, color:C.sub }}>MoM</span>
+          <span style={{ display:"flex", alignItems:"center", gap:3, fontSize:11, fontWeight:700, color:momColor,
+                         padding:"1px 6px", borderRadius:9, background: momPos === true ? C.greenGlow : momPos === false ? C.redGlow : "transparent" }}>
             {mom != null && <Arrow up={momPos} />}{fmtSignPct(mom)}
           </span>
         </div>
@@ -359,9 +370,9 @@ function ChequeCard({ d }) {
 }
 
 /* ════════════════════════════════
-   TREND CARD
+   TREND CARD — no top stripe, compact
 ════════════════════════════════ */
-function TrendCard({ d, idx }) {
+function TrendCard({ d }) {
   const { header, hero, count, pts, has } = d;
   const svgRef = useRef(null);
 
@@ -376,25 +387,25 @@ function TrendCard({ d, idx }) {
 
   return (
     <div style={{
-      position:"relative", height:"100%", boxSizing:"border-box", background:C.white,
-      borderRadius:14, border:"0.5px solid rgba(15,23,42,.06)", overflow:"hidden",
-      boxShadow:"0 1px 3px rgba(15,23,42,.04),0 6px 18px rgba(15,23,42,.06)", display:"flex", flexDirection:"column",
+      position:"relative", boxSizing:"border-box", background:C.white,
+      borderRadius:12, border:"0.5px solid rgba(15,23,42,.06)", overflow:"hidden",
+      boxShadow:"0 1px 3px rgba(15,23,42,.04),0 4px 14px rgba(15,23,42,.05)",
+      display:"flex", flexDirection:"column",
     }}>
-      <div style={{ height:3, background:`linear-gradient(90deg,${C.tealLt},${C.tealDk})` }} />
-      <div style={{ padding:"11px 13px 2px" }}>
-        <div style={{ fontSize:9, fontWeight:700, letterSpacing:".1em", textTransform:"uppercase", color:C.mut, marginBottom:7, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{header}</div>
+      <div style={{ padding:"11px 12px 0" }}>
+        <div style={{ fontSize:9, fontWeight:700, letterSpacing:".08em", textTransform:"uppercase", color:C.mut, marginBottom:6, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{header}</div>
         <div style={{ display:"flex", alignItems:"baseline", gap:6 }}>
-          <span style={{ fontSize:28, fontWeight:700, color:C.ink, letterSpacing:"-.04em", lineHeight:1, fontVariantNumeric:"tabular-nums", fontFamily:"ui-monospace,SFMono-Regular,Menlo,monospace" }}>{fmtPct(hero)}</span>
-          {count != null && <span style={{ fontSize:12, fontWeight:600, color:C.teal, fontFamily:"ui-monospace,monospace" }}>{fmtCount(count)}</span>}
+          <span style={{ fontSize:25, fontWeight:700, color:C.ink, letterSpacing:"-.04em", lineHeight:1, fontVariantNumeric:"tabular-nums", fontFamily:"ui-monospace,SFMono-Regular,Menlo,monospace" }}>{fmtPct(hero)}</span>
+          {count != null && <span style={{ fontSize:11, fontWeight:600, color:C.teal, fontFamily:"ui-monospace,monospace" }}>{fmtCount(count)}</span>}
         </div>
-        {count != null && <div style={{ fontSize:8, fontWeight:600, letterSpacing:".08em", textTransform:"uppercase", color:C.faint, marginTop:3 }}>Count</div>}
+        {count != null && <div style={{ fontSize:7.5, fontWeight:600, letterSpacing:".08em", textTransform:"uppercase", color:C.faint, marginTop:2 }}>Count</div>}
       </div>
-      <div style={{ padding:"4px 6px 2px", marginTop:"auto" }}>
-        <svg ref={svgRef} viewBox="0 0 240 50" preserveAspectRatio="none" style={{ width:"100%", height:46, display:"block", overflow:"visible" }} />
+      <div style={{ padding:"6px 5px 0" }}>
+        <svg ref={svgRef} viewBox="0 0 240 44" preserveAspectRatio="none" style={{ width:"100%", height:40, display:"block", overflow:"visible" }} />
       </div>
-      <div style={{ display:"flex", justifyContent:"space-between", padding:"0 13px 10px" }}>
-        <span style={{ fontSize:7.5, fontWeight:600, color:C.faint }}>{first}</span>
-        <span style={{ fontSize:7.5, fontWeight:600, color:C.faint }}>{last}</span>
+      <div style={{ display:"flex", justifyContent:"space-between", padding:"0 12px 9px" }}>
+        <span style={{ fontSize:7, fontWeight:600, color:C.faint }}>{first}</span>
+        <span style={{ fontSize:7, fontWeight:600, color:C.faint }}>{last}</span>
       </div>
     </div>
   );
@@ -404,7 +415,7 @@ function buildSpark(svg, values) {
   if (!svg || values.length < 2) return;
   svg.innerHTML = "";
   const ns = "http://www.w3.org/2000/svg";
-  const W = 240, H = 50, pad = 5;
+  const W = 240, H = 44, pad = 5;
   const min = Math.min(...values), max = Math.max(...values), rng = max - min || 1, n = values.length;
   const toY = (v) => pad + (1 - (v - min) / rng) * (H - pad * 2);
   const pts = values.map((v, i) => ({ x: n === 1 ? W / 2 : (i / (n - 1)) * W, y: toY(v) }));
@@ -418,58 +429,55 @@ function buildSpark(svg, values) {
   };
   const mk = (t, a) => { const e = document.createElementNS(ns, t); Object.entries(a).forEach(([k, v]) => e.setAttribute(k, v)); return e; };
   const defs = mk("defs", {});
-  const g = mk("linearGradient", { id: "kbF" + Math.random().toString(36).slice(2, 7), x1: "0", y1: "0", x2: "0", y2: "1" });
-  const gid = g.getAttribute("id");
-  g.append(mk("stop", { offset: "0%", "stop-color": C.tealLt, "stop-opacity": ".28" }), mk("stop", { offset: "100%", "stop-color": C.teal, "stop-opacity": "0" }));
+  const gid = "kbF" + Math.random().toString(36).slice(2, 7);
+  const g = mk("linearGradient", { id: gid, x1: "0", y1: "0", x2: "0", y2: "1" });
+  g.append(mk("stop", { offset: "0%", "stop-color": C.tealLt, "stop-opacity": ".26" }), mk("stop", { offset: "100%", "stop-color": C.teal, "stop-opacity": "0" }));
   defs.append(g); svg.appendChild(defs);
   const d = bez(pts);
   svg.appendChild(mk("path", { d: `${d} L ${pts[n-1].x} ${H} L ${pts[0].x} ${H} Z`, fill: `url(#${gid})` }));
-  const line = mk("path", { d, fill: "none", stroke: C.teal, "stroke-width": "2", "stroke-linecap": "round", "stroke-linejoin": "round", "stroke-dasharray": "600", "stroke-dashoffset": "600" });
+  const line = mk("path", { d, fill: "none", stroke: C.teal, "stroke-width": "1.9", "stroke-linecap": "round", "stroke-linejoin": "round", "stroke-dasharray": "600", "stroke-dashoffset": "600" });
   svg.appendChild(line);
   requestAnimationFrame(() => { line.style.transition = "stroke-dashoffset 1s cubic-bezier(.16,1,.3,1)"; line.setAttribute("stroke-dashoffset", "0"); });
   const lp = pts[n - 1];
-  const dot = mk("circle", { cx: lp.x, cy: lp.y, r: "3", fill: C.teal, stroke: "#fff", "stroke-width": "1.8" });
+  const dot = mk("circle", { cx: lp.x, cy: lp.y, r: "2.8", fill: C.teal, stroke: "#fff", "stroke-width": "1.6" });
   dot.style.opacity = "0"; dot.style.transition = "opacity .3s .7s"; svg.appendChild(dot);
   requestAnimationFrame(() => { dot.style.opacity = "1"; });
 }
 
 /* ════════════════════════════════
-   PLACEHOLDERS / STATES
+   STATES
 ════════════════════════════════ */
 function CardPlaceholder({ label, sub }) {
   return (
-    <div style={{ height:"100%", boxSizing:"border-box", border:`1px dashed ${C.chequeBd}`, borderRadius:14, background:"rgba(248,249,251,.5)",
-                  display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:4, padding:10 }}>
-      <span style={{ fontSize:10, fontWeight:600, color:C.mut }}>{label}</span>
+    <div style={{ boxSizing:"border-box", border:`1px dashed ${C.chequeBd}`, borderRadius:12, background:"rgba(248,249,251,.5)",
+                  display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:3, padding:"22px 10px", minHeight:110 }}>
+      <span style={{ fontSize:9.5, fontWeight:600, color:C.mut }}>{label}</span>
       <span style={{ fontSize:8, color:C.faint, textAlign:"center" }}>{sub}</span>
     </div>
   );
 }
 function EmptyHint() {
   return (
-    <div style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center", border:`1px dashed ${C.chequeBd}`, borderRadius:14, background:"rgba(248,249,251,.5)", padding:16 }}>
-      <span style={{ fontSize:11, color:C.mut, textAlign:"center", lineHeight:1.5 }}>
+    <div style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center", border:`1px dashed ${C.chequeBd}`, borderRadius:12, background:"rgba(248,249,251,.5)", padding:16, minHeight:90 }}>
+      <span style={{ fontSize:10.5, color:C.mut, textAlign:"center", lineHeight:1.5 }}>
         Drop your calculated fields onto <b>Detail</b>.<br/>
-        <span style={{ fontSize:9, color:C.faint }}>cheque1_* , cheque2_* , trend1_* , trend2_* , trend3_*</span>
+        <span style={{ fontSize:8.5, color:C.faint }}>cheque1_* , cheque2_* , trend1_* , trend2_* , trend3_*</span>
       </span>
     </div>
   );
 }
 function BarSkeleton() {
   return (
-    <div style={{ width:"100%", height:"100%", display:"flex", flexDirection:"column", gap:8 }}>
-      <div style={{ height:18, width:160, borderRadius:5, background:"linear-gradient(90deg,#f1f5f9 25%,#e2e8f0 50%,#f1f5f9 75%)", backgroundSize:"200% 100%", animation:"kbShim 1.4s infinite" }} />
-      <div style={{ display:"flex", gap:8, flex:1 }}>
-        {[0,1,2,3,4].map((i) => (
-          <div key={i} style={{ flex:1, borderRadius:14, background:"linear-gradient(90deg,#f1f5f9 25%,#e2e8f0 50%,#f1f5f9 75%)", backgroundSize:"200% 100%", animation:"kbShim 1.4s infinite" }} />
-        ))}
-      </div>
+    <div style={{ width:"100%", display:"flex", gap:8 }}>
+      {[0,1,2,3,4].map((i) => (
+        <div key={i} style={{ flex:1, height:120, borderRadius:12, background:"linear-gradient(90deg,#f1f5f9 25%,#e2e8f0 50%,#f1f5f9 75%)", backgroundSize:"200% 100%", animation:"kbShim 1.4s infinite" }} />
+      ))}
     </div>
   );
 }
 function ErrView({ msg }) {
   return (
-    <div style={{ width:"100%", height:"100%", display:"flex", alignItems:"center", justifyContent:"center", padding:16 }}>
+    <div style={{ width:"100%", display:"flex", alignItems:"center", justifyContent:"center", padding:16 }}>
       <span style={{ fontSize:11, color:C.red, fontWeight:600, textAlign:"center" }}>{msg}</span>
     </div>
   );
