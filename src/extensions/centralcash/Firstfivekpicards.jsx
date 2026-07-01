@@ -2,19 +2,16 @@ import { useEffect, useRef, useState } from "react";
 
 /* ═══════════════════════════════════════════════════════════
    CASH POSITION CARDS — single-file React Viz Extension
-   Big Total LCEY (2x2) + 5 LKR category cards (icons) +
-   3 major-currency cards (flags). Pure-white rounded cards on a
-   transparent background. Each card: dynamic header · auto-unit
-   hero · delta vs last working day (colored arrow) · trend line.
-   Sized for a ~1300px dashboard, responsive.
+   Default: Total LCEY (2x2) + LKR + USD + EUR + GBP.
+   The LKR card has a "Breakdown" toggle. When ON, the 3 FCY
+   cards animate out and the 5 LKR-category cards animate in
+   (Cash on Hand, In Transit, ATM, CRM, CDM). Toggle OFF → FCY
+   returns. Pure-white rounded cards, transparent bg, icons +
+   flags, auto-unit hero, delta arrow, trend line. Responsive.
 
-   Fields (drop ALL on Detail, per card, matched by name):
-     <key>_hero   (numeric) — big amount (auto Mn/Bn/Tn)
-     <key>_delta  (numeric) — vs last working day
-     <key>_value  (numeric) — trend series
-     <key>_date   (date)    — trend x-axis (optional)
-     <key>_header (string)  — header override (optional)
-   keys: lcey, coh, cit, atm, crm, cdm, usd, eur, gbp
+   Fields (Detail, per card, by name):
+     <key>_hero _delta _value _date  [+ _header override]
+   keys: lcey, lkr, usd, eur, gbp, coh, cit, atm, crm, cdm
 ═══════════════════════════════════════════════════════════ */
 
 if (typeof window !== "undefined" && !document.getElementById("cc-kf")) {
@@ -22,7 +19,7 @@ if (typeof window !== "undefined" && !document.getElementById("cc-kf")) {
   s.id = "cc-kf";
   s.innerHTML =
     "@keyframes ccShim{0%{background-position:200% 0}100%{background-position:-200% 0}}" +
-    "@keyframes ccIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}";
+    "@keyframes ccEnter{0%{opacity:0;transform:translateY(12px) scale(.96)}100%{opacity:1;transform:none}}";
   document.head.appendChild(s);
 }
 
@@ -107,62 +104,49 @@ function parseDate(dv) {
   return null;
 }
 
-/* ════════════════════════════════
-   ICONS  (stroke, 24x24)
-════════════════════════════════ */
+/* ── icons ── */
 const Icon = {
-  bank: (p) => <g {...p}><path d="M3 21h18M4 21V10m4 11V10m8 11V10m4 11V10M12 3 3 8h18l-9-5Z"/></g>,          // LCEY
-  wallet: (p) => <g {...p}><path d="M3 7h16a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a1 1 0 0 1 1-1h13"/><circle cx="17" cy="13" r="1.3"/></g>, // Cash on Hand
-  truck: (p) => <g {...p}><path d="M1 4h13v11H1zM14 8h4l3 3v4h-7"/><circle cx="6" cy="18" r="1.8"/><circle cx="17.5" cy="18" r="1.8"/></g>, // In Transit
-  atm: (p) => <g {...p}><rect x="4" y="3" width="16" height="14" rx="1.5"/><path d="M8 21h8M9 7h6M9 11h4"/></g>,   // ATM
-  recycle: (p) => <g {...p}><path d="M7 19H4l3-5m10 5 2-3-5 1M12 4l3 5-6 0m8-1 1.5 3M6.5 9 5 6"/></g>,          // CRM
-  deposit: (p) => <g {...p}><path d="M12 3v9m0 0 4-4m-4 4-4-4M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></g>,   // CDM
+  bank: <path d="M3 21h18M4 21V10m4 11V10m8 11V10m4 11V10M12 3 3 8h18l-9-5Z"/>,
+  rupee: <path d="M6 3h12M6 8h12M15.5 3c0 4-3 5-6.5 5H6l7 10"/>,
+  wallet: <g><path d="M3 7h16a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a1 1 0 0 1 1-1h13"/><circle cx="17" cy="13" r="1.3"/></g>,
+  truck: <g><path d="M1 4h13v11H1zM14 8h4l3 3v4h-7"/><circle cx="6" cy="18" r="1.8"/><circle cx="17.5" cy="18" r="1.8"/></g>,
+  atm: <g><rect x="4" y="3" width="16" height="14" rx="1.5"/><path d="M8 21h8M9 7h6M9 11h4"/></g>,
+  recycle: <path d="M7 19H4l3-5m10 5 2-3-5 1M12 4l3 5-6 0m8-1 1.5 3M6.5 9 5 6"/>,
+  deposit: <path d="M12 3v9m0 0 4-4m-4 4-4-4M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/>,
 };
-
-/* ── simple SVG flags (render on Windows unlike emoji) ── */
-function FlagUSD() {
-  return (
-    <svg width="26" height="18" viewBox="0 0 26 18" style={{ borderRadius:3, display:"block", boxShadow:"0 0 0 1px rgba(0,0,0,.06)" }}>
-      {[0,1,2,3,4,5,6].map((i) => <rect key={i} x="0" y={i * (18/7)} width="26" height={18/7} fill={i % 2 ? "#fff" : "#b22234"} />)}
-      <rect x="0" y="0" width="11" height={18/7*4} fill="#3c3b6e" />
-      {[...Array(6)].map((_, i) => <circle key={i} cx={2 + (i % 3) * 3.5} cy={2 + Math.floor(i / 3) * 4} r="0.7" fill="#fff" />)}
-    </svg>
-  );
-}
-function FlagEUR() {
-  return (
-    <svg width="26" height="18" viewBox="0 0 26 18" style={{ borderRadius:3, display:"block", boxShadow:"0 0 0 1px rgba(0,0,0,.06)" }}>
-      <rect width="26" height="18" fill="#003399" />
-      {[...Array(12)].map((_, i) => {
-        const ang = (i / 12) * Math.PI * 2 - Math.PI / 2;
-        return <circle key={i} cx={13 + Math.cos(ang) * 5.5} cy={9 + Math.sin(ang) * 5.5} r="0.9" fill="#ffcc00" />;
-      })}
-    </svg>
-  );
-}
-function FlagGBP() {
-  return (
-    <svg width="26" height="18" viewBox="0 0 26 18" style={{ borderRadius:3, display:"block", boxShadow:"0 0 0 1px rgba(0,0,0,.06)" }}>
-      <rect width="26" height="18" fill="#012169" />
-      <path d="M0 0 26 18M26 0 0 18" stroke="#fff" strokeWidth="3.5" />
-      <path d="M0 0 26 18M26 0 0 18" stroke="#c8102e" strokeWidth="1.8" />
-      <path d="M13 0V18M0 9H26" stroke="#fff" strokeWidth="5" />
-      <path d="M13 0V18M0 9H26" stroke="#c8102e" strokeWidth="2.6" />
-    </svg>
-  );
-}
+function FlagUSD() { return (
+  <svg width="26" height="18" viewBox="0 0 26 18" style={{ borderRadius:3, display:"block", boxShadow:"0 0 0 1px rgba(0,0,0,.06)" }}>
+    {[0,1,2,3,4,5,6].map((i) => <rect key={i} x="0" y={i * (18/7)} width="26" height={18/7} fill={i % 2 ? "#fff" : "#b22234"} />)}
+    <rect x="0" y="0" width="11" height={18/7*4} fill="#3c3b6e" />
+  </svg>); }
+function FlagEUR() { return (
+  <svg width="26" height="18" viewBox="0 0 26 18" style={{ borderRadius:3, display:"block", boxShadow:"0 0 0 1px rgba(0,0,0,.06)" }}>
+    <rect width="26" height="18" fill="#003399" />
+    {[...Array(12)].map((_, i) => { const a = (i/12)*Math.PI*2 - Math.PI/2; return <circle key={i} cx={13+Math.cos(a)*5.5} cy={9+Math.sin(a)*5.5} r="0.9" fill="#ffcc00" />; })}
+  </svg>); }
+function FlagGBP() { return (
+  <svg width="26" height="18" viewBox="0 0 26 18" style={{ borderRadius:3, display:"block", boxShadow:"0 0 0 1px rgba(0,0,0,.06)" }}>
+    <rect width="26" height="18" fill="#012169" />
+    <path d="M0 0 26 18M26 0 0 18" stroke="#fff" strokeWidth="3.5" />
+    <path d="M0 0 26 18M26 0 0 18" stroke="#c8102e" strokeWidth="1.8" />
+    <path d="M13 0V18M0 9H26" stroke="#fff" strokeWidth="5" />
+    <path d="M13 0V18M0 9H26" stroke="#c8102e" strokeWidth="2.6" />
+  </svg>); }
 
 /* card definitions */
-const CARDS = [
-  { key: "lcey", label: "Total LCEY",     icon: "bank",    big: true },
-  { key: "coh",  label: "Cash on Hand",   icon: "wallet"  },
-  { key: "cit",  label: "Cash in Transit",icon: "truck"   },
-  { key: "atm",  label: "ATM Cash",       icon: "atm"     },
-  { key: "crm",  label: "CRM Cash",       icon: "recycle" },
-  { key: "cdm",  label: "CDM Cash",       icon: "deposit" },
-  { key: "usd",  label: "USD", flag: "USD" },
-  { key: "eur",  label: "EUR", flag: "EUR" },
-  { key: "gbp",  label: "GBP", flag: "GBP" },
+const LCEY = { key: "lcey", label: "Total LCEY", icon: "bank", big: true };
+const LKR  = { key: "lkr",  label: "LKR", icon: "rupee", toggle: true };
+const FCY  = [
+  { key: "usd", label: "USD", flag: "USD" },
+  { key: "eur", label: "EUR", flag: "EUR" },
+  { key: "gbp", label: "GBP", flag: "GBP" },
+];
+const BREAKDOWN = [
+  { key: "coh", label: "Cash on Hand",    icon: "wallet"  },
+  { key: "cit", label: "Cash in Transit", icon: "truck"   },
+  { key: "atm", label: "ATM Cash",        icon: "atm"     },
+  { key: "crm", label: "CRM Cash",        icon: "recycle" },
+  { key: "cdm", label: "CDM Cash",        icon: "deposit" },
 ];
 
 /* ════════════════════════════════
@@ -205,21 +189,22 @@ function Shell({ children }) {
 }
 
 /* ════════════════════════════════
-   GRID
+   GRID  (with breakdown toggle)
 ════════════════════════════════ */
 function Grid({ rows }) {
   const wrapRef = useRef(null);
-  const [cols, setCols] = useState(6);
+  const [cols, setCols] = useState(5);
+  const [breakdown, setBreakdown] = useState(false);
 
   useEffect(() => {
     if (!wrapRef.current) return;
     const ro = new ResizeObserver((e) => {
       const w = e[0].contentRect.width;
-      setCols(w >= 1080 ? 6 : w >= 720 ? 4 : 2);
+      setCols(w >= 1000 ? (breakdown ? 5 : 4) : w >= 680 ? (breakdown ? 4 : 3) : 2);
     });
     ro.observe(wrapRef.current);
     return () => ro.disconnect();
-  }, []);
+  }, [breakdown]);
 
   const build = (key) => {
     const hk = keyFor(rows, key + "_header");
@@ -237,30 +222,41 @@ function Grid({ rows }) {
     return { hero, delta, pts: pts.map((x) => x.v), headerOverride, has: !!(hr || vk) };
   };
 
-  /* grid template: LCEY spans 2x2; rest fill remaining cells */
+  /* which small cards show */
+  const smallCards = breakdown ? [LKR, ...BREAKDOWN] : [LKR, ...FCY];
+
   const gridStyle = {
     display: "grid", width: "100%", height: "100%", gap: 10, boxSizing: "border-box",
-    gridTemplateColumns: `repeat(${cols}, 1fr)`,
-    gridTemplateRows: cols === 6 ? "1fr 1fr" : cols === 4 ? "1fr 1fr 1fr" : "auto",
-    gridAutoRows: cols === 2 ? "minmax(120px, 1fr)" : undefined,
+    gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
+    gridTemplateRows: cols >= 4 ? "1fr 1fr" : "auto",
+    gridAutoRows: cols === 2 ? "minmax(120px,1fr)" : undefined,
+    transition: "grid-template-columns .45s cubic-bezier(.16,1,.3,1)",
   };
+  const bigSpan = cols === 2
+    ? { gridColumn: "1 / 3", gridRow: "1 / 2", minHeight: 170 }
+    : { gridColumn: "1 / 3", gridRow: "1 / 3" };
 
   return (
     <div ref={wrapRef} style={{ width:"100%", height:"100%" }}>
       <div style={gridStyle}>
-        {CARDS.map((cfg, i) => {
-          const d = build(cfg.key);
-          const span = cfg.big
-            ? (cols === 2
-                ? { gridColumn: "1 / 3", gridRow: "1 / 2", minHeight: 180 }
-                : { gridColumn: "1 / 3", gridRow: "1 / 3" })
-            : {};
-          return (
-            <div key={cfg.key} style={{ minWidth:0, minHeight:0, ...span }}>
-              <Card cfg={cfg} d={d} idx={i} />
-            </div>
-          );
-        })}
+        {/* big LCEY — always */}
+        <div style={{ minWidth:0, minHeight:0, ...bigSpan }}>
+          <Card cfg={LCEY} d={build(LCEY.key)} idx={0} />
+        </div>
+
+        {/* small cards — re-keyed on `breakdown` so they replay entrance animation */}
+        {smallCards.map((cfg, i) => (
+          <div key={(breakdown ? "b-" : "f-") + cfg.key} style={{ minWidth:0, minHeight:0 }}>
+            <Card
+              cfg={cfg}
+              d={build(cfg.key)}
+              idx={i + 1}
+              enter
+              breakdownOn={breakdown}
+              onToggle={cfg.toggle ? () => setBreakdown((v) => !v) : null}
+            />
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -269,7 +265,7 @@ function Grid({ rows }) {
 /* ════════════════════════════════
    CARD
 ════════════════════════════════ */
-function Card({ cfg, d, idx }) {
+function Card({ cfg, d, idx, enter, onToggle, breakdownOn }) {
   const big = !!cfg.big;
   const svgRef = useRef(null);
   const valsKey = d.pts.join(",");
@@ -284,28 +280,36 @@ function Card({ cfg, d, idx }) {
   const dPos = d.delta != null ? d.delta >= 0 : null;
   const dColor = dPos === true ? C.green : dPos === false ? C.red : C.mut;
   const dGlow  = dPos === true ? C.greenGlow : dPos === false ? C.redGlow : "transparent";
+  const active = !!onToggle && breakdownOn;
 
   return (
     <div style={{
-      width:"100%", height:"100%", boxSizing:"border-box", background:C.bg,
-      borderRadius: big ? 20 : 16, border:`1px solid ${C.line}`,
-      boxShadow: big ? "0 2px 12px rgba(15,28,46,.06),0 10px 30px rgba(15,28,46,.06)" : "0 1px 5px rgba(15,28,46,.05)",
+      position:"relative", width:"100%", height:"100%", boxSizing:"border-box", background:C.bg,
+      borderRadius: big ? 20 : 16,
+      border:`1px solid ${active ? "rgba(13,148,136,.4)" : C.line}`,
+      boxShadow: active
+        ? "0 0 0 3px rgba(13,148,136,.10), 0 2px 12px rgba(13,148,136,.10)"
+        : big ? "0 2px 12px rgba(15,28,46,.06),0 10px 30px rgba(15,28,46,.06)" : "0 1px 5px rgba(15,28,46,.05)",
       padding: big ? "20px 22px 16px" : "14px 15px 11px",
       display:"flex", flexDirection:"column", overflow:"hidden",
-      animation:`ccIn .45s cubic-bezier(.16,1,.3,1) ${idx * 0.04}s both`,
+      animation: enter ? `ccEnter .5s cubic-bezier(.16,1,.3,1) ${idx * 0.05}s both` : `ccEnter .5s cubic-bezier(.16,1,.3,1) both`,
+      transition:"border-color .3s, box-shadow .3s",
     }}>
-      {/* header row: icon/flag + title */}
+      {/* header row */}
       <div style={{ display:"flex", alignItems:"center", gap: big ? 9 : 7, marginBottom: big ? 12 : 7 }}>
         <span style={{ flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center",
                        width: big ? 30 : 22, height: big ? 30 : 22, borderRadius: big ? 9 : 7,
                        background: cfg.flag ? "transparent" : C.tealBg }}>
           {cfg.flag
             ? (cfg.flag === "USD" ? <FlagUSD /> : cfg.flag === "EUR" ? <FlagEUR /> : <FlagGBP />)
-            : <svg width={big ? 17 : 13} height={big ? 17 : 13} viewBox="0 0 24 24" fill="none" stroke={C.teal} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{Icon[cfg.icon]({})}</svg>
+            : <svg width={big ? 17 : 13} height={big ? 17 : 13} viewBox="0 0 24 24" fill="none" stroke={C.teal} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{Icon[cfg.icon]}</svg>
           }
         </span>
         <span style={{ fontSize: big ? 12 : 9.5, fontWeight:700, letterSpacing:".05em", textTransform:"uppercase",
-                       color:C.mut, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{header}</span>
+                       color:C.mut, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", flex:1 }}>{header}</span>
+
+        {/* breakdown toggle (LKR only) */}
+        {onToggle && <ToggleBtn active={active} onClick={onToggle} />}
       </div>
 
       {/* hero */}
@@ -329,12 +333,40 @@ function Card({ cfg, d, idx }) {
         </div>
       )}
 
-      {/* trend line pinned to bottom */}
+      {/* trend */}
       <div style={{ flex:1, minHeight: big ? 70 : 30, marginTop:"auto", paddingTop: big ? 12 : 6, display:"flex", alignItems:"flex-end" }}>
         <svg ref={svgRef} viewBox={`0 0 240 ${big ? 80 : 40}`} preserveAspectRatio="none"
              style={{ width:"100%", height: big ? 80 : 40, display:"block", overflow:"visible" }} />
       </div>
     </div>
+  );
+}
+
+/* ── modern toggle button ── */
+function ToggleBtn({ active, onClick }) {
+  const [hov, setHov] = useState(false);
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
+      title={active ? "Hide breakdown" : "View LKR breakdown"}
+      style={{
+        display:"inline-flex", alignItems:"center", gap:4, flexShrink:0, height:22, padding:"0 8px 0 7px",
+        borderRadius:20, cursor:"pointer", outline:"none", fontFamily:"inherit", fontSize:9.5, fontWeight:700,
+        letterSpacing:".02em", textTransform:"uppercase",
+        border:"1px solid " + (active || hov ? "rgba(13,148,136,.4)" : C.line),
+        background: active ? C.teal : hov ? "rgba(13,148,136,.08)" : "#fff",
+        color: active ? "#fff" : C.tealDk,
+        transition:"all .22s cubic-bezier(.16,1,.3,1)",
+      }}
+    >
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"
+           style={{ transform: active ? "rotate(180deg)" : "none", transition:"transform .3s cubic-bezier(.16,1,.3,1)" }}>
+        <polyline points="6 9 12 15 18 9" />
+      </svg>
+      {active ? "Hide" : "Split"}
+    </button>
   );
 }
 
@@ -375,9 +407,9 @@ function buildSpark(svg, values, big) {
 /* ── states ── */
 function Skeleton() {
   return (
-    <div style={{ width:"100%", height:"100%", display:"grid", gridTemplateColumns:"repeat(6,1fr)", gridTemplateRows:"1fr 1fr", gap:10 }}>
+    <div style={{ width:"100%", height:"100%", display:"grid", gridTemplateColumns:"repeat(4,1fr)", gridTemplateRows:"1fr 1fr", gap:10 }}>
       <div style={{ gridColumn:"1 / 3", gridRow:"1 / 3", borderRadius:20, background:"linear-gradient(90deg,#f1f5f9 25%,#e2e8f0 50%,#f1f5f9 75%)", backgroundSize:"200% 100%", animation:"ccShim 1.4s infinite" }} />
-      {[...Array(8)].map((_, i) => (
+      {[...Array(4)].map((_, i) => (
         <div key={i} style={{ borderRadius:16, background:"linear-gradient(90deg,#f1f5f9 25%,#e2e8f0 50%,#f1f5f9 75%)", backgroundSize:"200% 100%", animation:"ccShim 1.4s infinite" }} />
       ))}
     </div>
