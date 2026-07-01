@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState, useMemo } from "react";
 
 /* ═══════════════════════════════════════════════════════════
-   MAP — single-file React Viz Extension
+   MAP — Single-file React Viz Extension
    Leaflet base map (loaded from CDN at runtime) · circles sized &
    colored by value · auto-fits to all points · hover popups ·
-   dynamic header · color legend.
+   balance-themed color spectrum · hidden flyout settings controls.
 
    Fields (drop ALL on Detail, matched by calculated-field name):
      map_lat      (numeric) — latitude   [required]
@@ -30,15 +30,16 @@ if (typeof window !== "undefined" && !document.getElementById("mp-kf")) {
 const C = {
   ink: "#0f172a", sub: "#475569", mut: "#64748b", faint: "#e2e8f0",
   bg: "#ffffff", line: "rgba(15,23,42,0.06)", track: "#f1f5f9",
-  accent: "#0284c7", accentLt: "#38bdf8",
+  accent: "#475569", accentLt: "#94a3b8",
 };
 
+/* Balanced Diverging Ramp: Cool Slate-Blue (Low) → Neutral Cream (Mid) → Deep Coral (High) */
 const RAMP = [
-  { t: 0.0, c: [45, 212, 191] },
-  { t: 0.35, c: [13, 148, 136] },
-  { t: 0.6, c: [217, 119, 6] },
-  { t: 0.8, c: [220, 38, 38] },
-  { t: 1.0, c: [153, 27, 27] },
+  { t: 0.0, c: [71, 85, 105] },     // Slate Blue (Below balance)
+  { t: 0.25, c: [148, 163, 184] }, // Muted Blue-Gray
+  { t: 0.5, c: [241, 245, 249] },  // Neutral Platinum (Balanced point)
+  { t: 0.75, c: [248, 113, 113] }, // Soft Coral-Red
+  { t: 1.0, c: [185, 28, 28] },    // Deep Coral (Above balance)
 ];
 
 function rampColor(t) {
@@ -172,9 +173,10 @@ function MapInner({ rows }) {
   const [ready, setReady] = useState(false);
   const [loadErr, setLoadErr] = useState(null);
   
-  // Custom Controls States
-  const [scaleMode, setScaleMode] = useState("size"); // 'size' or 'color'
-  const [baseRadius, setBaseRadius] = useState(8);    // User controlled static size for Color Mode
+  // Custom Modern Interface States
+  const [showSettings, setShowSettings] = useState(false);
+  const [scaleMode, setScaleMode] = useState("size"); 
+  const [baseRadius, setBaseRadius] = useState(8);    
 
   const keys = useMemo(() => ({
     lat: keyFor(rows, "map_lat"),
@@ -204,12 +206,10 @@ function MapInner({ rows }) {
       if (cancelled || !mapElRef.current || mapRef.current) return;
       const map = L.map(mapElRef.current, { zoomControl: false, attributionControl: false, scrollWheelZoom: true });
       
-      // Clean modern vector-basemap palette
       L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
         maxZoom: 19,
       }).addTo(map);
 
-      // Shift essential zoom controls to lower right quadrant for architectural neatness
       L.control.zoom({ position: 'bottomright' }).addTo(map);
 
       mapRef.current = map;
@@ -230,33 +230,33 @@ function MapInner({ rows }) {
     points.forEach((p) => {
       const t = (p.value - vMin) / range;
       
-      // Smart sizing/coloring logical branching
       const color = scaleMode === "color" ? rampColor(t) : C.accent;
-      const radius = scaleMode === "size" ? (6 + t * 18) : baseRadius;
+      const radius = scaleMode === "size" ? (5 + t * 15) : baseRadius;
 
       latlngs.push([p.lat, p.lng]);
       const marker = L.circleMarker([p.lat, p.lng], {
-        radius, color: "#ffffff", weight: 1.5, fillColor: color, fillOpacity: 0.85,
+        radius, color: "#ffffff", weight: 1.2, fillColor: color, fillOpacity: 0.88,
       });
 
       const labelLine = p.label ? `<div style="font-size:12px;font-weight:600;color:#fff;margin-bottom:6px;letter-spacing:-0.1px">${escapeHtml(p.label)}</div>` : "";
       marker.bindPopup(
         `${labelLine}` +
         `<div style="display:flex;justify-content:space-between;gap:16px;margin-bottom:4px"><span style="font-size:10px;color:rgba(255,255,255,0.5)">Metric Value</span><span style="font-size:11px;font-weight:600;color:#fff;font-family:ui-monospace,monospace">${fmtFull(p.value)}</span></div>` +
-        `<div style="display:flex;justify-content:space-between;gap:16px"><span style="font-size:10px;color:rgba(255,255,255,0.5)">Coordinates</span><span style="font-size:10px;color:rgba(255,255,255,0.7),monospace">${p.lat.toFixed(4)}, ${p.lng.toFixed(4)}</span></div>`,
+        `<div style="display:flex;justify-content:space-between;gap:16px"><span style="font-size:10px;color:rgba(255,255,255,0.5)">Coordinates</span><span style="font-size:10px;color:rgba(255,255,255,0.7)">${p.lat.toFixed(4)}, ${p.lng.toFixed(4)}</span></div>`,
         { className: "mp-pop", closeButton: false }
       );
 
-      marker.on("mouseover", function () { this.openPopup(); this.setStyle({ weight: 2.5, fillOpacity: 1 }); });
-      marker.on("mouseout", function () { this.closePopup(); this.setStyle({ weight: 1.5, fillOpacity: 0.85 }); });
+      marker.on("mouseover", function () { this.openPopup(); this.setStyle({ weight: 2, fillOpacity: 1 }); });
+      marker.on("mouseout", function () { this.closePopup(); this.setStyle({ weight: 1.2, fillOpacity: 0.88 }); });
       marker.addTo(layer);
     });
 
+    /* AUTO-FIT: Strictly lock bounds viewport to content-filled regions only */
     if (latlngs.length === 1) {
-      mapRef.current.setView(latlngs[0], 11);
+      mapRef.current.setView(latlngs[0], 12);
     } else {
       const bounds = L.latLngBounds(latlngs);
-      mapRef.current.fitBounds(bounds, { padding: [40, 40], maxZoom: 14 });
+      mapRef.current.fitBounds(bounds, { padding: [20, 20] }); // Form-fitted tight crop
     }
     setTimeout(() => mapRef.current && mapRef.current.invalidateSize(), 60);
   }, [ready, points, vMin, range, scaleMode, baseRadius]);
@@ -280,84 +280,98 @@ function MapInner({ rows }) {
         {!points.length && ready && <NoPoints />}
         {!ready && !loadErr && <LoadingMap />}
 
-        {/* MODERN SIDE PANEL CONTROL CONTROLLER */}
+        {/* GEAR SETTINGS FLYOUT ACTION CONTAINER */}
         {ready && points.length > 0 && (
-          <div style={{ position:"absolute", top:16, right:16, zIndex:500, width:240,
-                        background:"rgba(15, 23, 42, 0.9)", backdropFilter:"blur(16px)", WebkitBackdropFilter:"blur(16px)",
-                        padding:14, borderRadius:14, border:"1px solid rgba(255,255,255,0.08)",
-                        boxShadow:"0 10px 25px -5px rgba(0,0,0,0.3), 0 8px 10px -6px rgba(0,0,0,0.3)",
-                        display:"flex", flexDirection:"column", gap:12 }}>
+          <div style={{ position:"absolute", top:16, right:16, zIndex:500, display:"flex", flexDirection:"column", alignItems:"flex-end", gap:8 }}>
             
-            <div>
-              <div style={{ fontSize:11, fontWeight:600, color:"rgba(255,255,255,0.4)", textTransform:"uppercase", letterSpacing:"0.6px" }}>Display Scale</div>
-              
-              {/* Pill Selection Element */}
-              <div style={{ background:"rgba(255,255,255,0.06)", padding:3, borderRadius:8, display:"flex", marginTop:6 }}>
-                <button 
-                  onClick={() => setScaleMode("size")}
-                  style={{ border:"none", flex:1, padding:"6px 0", borderRadius:6, fontSize:11, fontWeight:600, cursor:"pointer", transition:"all 0.15s ease",
-                           background: scaleMode === "size" ? "#ffffff" : "transparent",
-                           color: scaleMode === "size" ? C.ink : "rgba(255,255,255,0.6)" }}
-                >
-                  Size of Shape
-                </button>
-                <button 
-                  onClick={() => setScaleMode("color")}
-                  style={{ border:"none", flex:1, padding:"6px 0", borderRadius:6, fontSize:11, fontWeight:600, cursor:"pointer", transition:"all 0.15s ease",
-                           background: scaleMode === "color" ? "#ffffff" : "transparent",
-                           color: scaleMode === "color" ? C.ink : "rgba(255,255,255,0.6)" }}
-                >
-                  Color Spectrum
-                </button>
-              </div>
-            </div>
+            {/* Minimalist Gear Button */}
+            <button 
+              onClick={() => setShowSettings(!showSettings)}
+              style={{ border: "none", width: 36, height: 36, borderRadius: 10, background: "rgba(15, 23, 42, 0.9)",
+                       color: "#ffffff", fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", 
+                       justifyContent: "center", boxShadow: "0 4px 12px rgba(0,0,0,0.15)", transition: "transform 0.2s ease",
+                       transform: showSettings ? "rotate(45deg)" : "rotate(0deg)" }}
+            >
+              ⚙️
+            </button>
 
-            {/* Dynamic Slider (Only Active/Visible during Color Mode Selection) */}
-            {scaleMode === "color" && (
-              <div style={{ borderTop:"1px solid rgba(255,255,255,0.08)", paddingTop:10 }}>
-                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:5 }}>
-                  <span style={{ fontSize:10, fontWeight:500, color:"rgba(255,255,255,0.5)" }}>Adjust Base Radius</span>
-                  <span style={{ fontSize:10, fontFamily:"monospace", color:"#fff", background:"rgba(255,255,255,0.1)", padding:"1px 4px", borderRadius:4 }}>{baseRadius}px</span>
+            {/* Collapsible Action Drawer Panel */}
+            {showSettings && (
+              <div style={{ width:220, background:"rgba(15, 23, 42, 0.95)", backdropFilter:"blur(16px)", WebkitBackdropFilter:"blur(16px)",
+                            padding:14, borderRadius:12, border:"1px solid rgba(255,255,255,0.08)",
+                            boxShadow:"0 10px 25px -5px rgba(0,0,0,0.3)", display:"flex", flexDirection:"column", gap:12 }}>
+                
+                <div>
+                  <div style={{ fontSize:10, fontWeight:600, color:"rgba(255,255,255,0.4)", textTransform:"uppercase", letterSpacing:"0.6px" }}>Scale Display By</div>
+                  
+                  <div style={{ background:"rgba(255,255,255,0.06)", padding:3, borderRadius:8, display:"flex", marginTop:6 }}>
+                    <button 
+                      onClick={() => setScaleMode("size")}
+                      style={{ border:"none", flex:1, padding:"5px 0", borderRadius:6, fontSize:11, fontWeight:600, cursor:"pointer", transition:"all 0.15s ease",
+                               background: scaleMode === "size" ? "#ffffff" : "transparent",
+                               color: scaleMode === "size" ? C.ink : "rgba(255,255,255,0.6)" }}
+                    >
+                      Size
+                    </button>
+                    <button 
+                      onClick={() => setScaleMode("color")}
+                      style={{ border:"none", flex:1, padding:"5px 0", borderRadius:6, fontSize:11, fontWeight:600, cursor:"pointer", transition:"all 0.15s ease",
+                               background: scaleMode === "color" ? "#ffffff" : "transparent",
+                               color: scaleMode === "color" ? C.ink : "rgba(255,255,255,0.6)" }}
+                    >
+                      Color
+                    </button>
+                  </div>
                 </div>
-                <input 
-                  type="range" 
-                  min="4" 
-                  max="32" 
-                  value={baseRadius} 
-                  onChange={(e) => setBaseRadius(parseInt(e.target.value, 10))}
-                  className="mp-slider"
-                  style={{ width:"100%", WebkitAppearance:"none", background:"transparent", outline:"none" }}
-                />
+
+                {scaleMode === "color" && (
+                  <div style={{ borderTop:"1px solid rgba(255,255,255,0.08)", paddingTop:10 }}>
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:5 }}>
+                      <span style={{ fontSize:10, fontWeight:500, color:"rgba(255,255,255,0.5)" }}>Shape Radius</span>
+                      <span style={{ fontSize:10, fontFamily:"monospace", color:"#fff" }}>{baseRadius}px</span>
+                    </div>
+                    <input 
+                      type="range" 
+                      min="4" 
+                      max="24" 
+                      value={baseRadius} 
+                      onChange={(e) => setBaseRadius(parseInt(e.target.value, 10))}
+                      className="mp-slider"
+                      style={{ width:"100%", WebkitAppearance:"none", background:"transparent", outline:"none" }}
+                    />
+                  </div>
+                )}
               </div>
             )}
-
-            {/* Footer Summary Info Inside Menu Frame */}
-            <div style={{ borderTop:"1px solid rgba(255,255,255,0.08)", paddingTop:8, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-              <span style={{ fontSize:10, color:"rgba(255,255,255,0.4)" }}>Dataset</span>
-              <span style={{ fontSize:10, fontWeight:600, color:C.accentLt }}>{points.length} locations active</span>
-            </div>
           </div>
         )}
 
-        {/* MINIMALIST SCALE LEGEND BOX */}
+        {/* DIVERGING BALANCE MAP LEGEND CONTENT */}
         {points.length > 0 && (
           <div style={{ position:"absolute", bottom:16, left:16, zIndex:500, background:"#ffffff",
                         borderRadius:10, border:`1px solid ${C.line}`, boxShadow:"0 4px 20px rgba(15,28,46,0.08)", padding:"10px 12px" }}>
             <div style={{ fontSize:9, fontWeight:700, letterSpacing:"0.4px", textTransform:"uppercase", color:C.mut, marginBottom:6 }}>
-              {scaleMode === "size" ? "Variable: Size Delta" : "Variable: Color Gradient"}
+              {scaleMode === "size" ? "Metric: Area Size" : "Metric: Balanced Divergence"}
             </div>
             
             {scaleMode === "color" ? (
-              <div style={{ width:130, height:6, borderRadius:3, background:`linear-gradient(90deg, ${rampColor(0)}, ${rampColor(0.35)}, ${rampColor(0.6)}, ${rampColor(0.8)}, ${rampColor(1)})` }} />
+              <div>
+                <div style={{ width:140, height:6, borderRadius:3, background:`linear-gradient(90deg, ${rampColor(0)}, ${rampColor(0.25)}, ${rampColor(0.5)}, ${rampColor(0.75)}, ${rampColor(1)})` }} />
+                <div style={{ display:"flex", justifyContent:"space-between", width:140, position:"relative", marginTop:2 }}>
+                  <span style={{ fontSize:7, color:C.mut, fontWeight:500 }}>Low</span>
+                  <span style={{ fontSize:7, color:C.mut, fontWeight:700, position:"absolute", left:"50%", transform:"translateX(-50%)" }}>Balanced</span>
+                  <span style={{ fontSize:7, color:C.mut, fontWeight:500 }}>High</span>
+                </div>
+              </div>
             ) : (
-              <div style={{ display:"flex", alignItems:"center", gap:6, height:6, width:130, padding:"0 2px" }}>
+              <div style={{ display:"flex", alignItems:"center", gap:6, height:6, width:140, padding:"0 2px" }}>
                 <div style={{ width:4, height:4, borderRadius:"50%", background:C.accent }} />
                 <div style={{ flex:1, height:1, background:C.faint }} />
                 <div style={{ width:10, height:10, borderRadius:"50%", background:C.accent }} />
               </div>
             )}
 
-            <div style={{ display:"flex", justifyContent:"space-between", marginTop:5 }}>
+            <div style={{ display:"flex", justifyContent:"space-between", marginTop:4 }}>
               <span style={{ fontSize:9, fontWeight:600, color:C.sub, fontFamily:"ui-monospace,monospace" }}>{fmtN(vMin)}</span>
               <span style={{ fontSize:9, fontWeight:600, color:C.sub, fontFamily:"ui-monospace,monospace" }}>{fmtN(vMax)}</span>
             </div>
@@ -379,19 +393,14 @@ function NoPoints() {
       <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke={C.mut} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
         <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z" /><circle cx="12" cy="10" r="3" />
       </svg>
-      <span style={{ fontSize:12, color:C.ink, fontWeight:500, textAlign:"center" }}>
-        Missing Dimensions
-      </span>
-      <span style={{ fontSize:10, color:C.mut, textAlign:"center", marginTop:-4 }}>
-        Map Lat, Map Lng, and Map Value properties are required.
-      </span>
+      <span style={{ fontSize:12, color:C.ink, fontWeight:500, textAlign:"center" }}> Missing Dimensions </span>
     </div>
   );
 }
 function LoadingMap() {
   return (
     <div style={{ position:"absolute", inset:0, display:"flex", alignItems:"center", justifyContent:"center", background:"#f8fafc", zIndex:400 }}>
-      <span style={{ fontSize:12, color:C.mut, fontWeight:500, letterSpacing:"0.2px" }}>Loading engine assets…</span>
+      <span style={{ fontSize:12, color:C.mut, fontWeight:500, letterSpacing:"0.2px" }}>Loading Map Engine...</span>
     </div>
   );
 }
@@ -405,7 +414,7 @@ function Skeleton() {
 function ErrView({ msg }) {
   return (
     <div style={{ width:"100%", height:"100%", display:"flex", alignItems:"center", justifyContent:"center", padding:16 }}>
-      <div style={{ background:"#fef2f2", border:"1px solid #fee2e2", padding:"12px 20px", borderRadius:10, fontSize:12, color:"#b91c1c", fontWeight:500, textAlign:"center", boxShadow:"0 2px 8px rgba(0,0,0,0.02)" }}>
+      <div style={{ background:"#fef2f2", border:"1px solid #fee2e2", padding:"12px 20px", borderRadius:10, fontSize:12, color:"#b91c1c", fontWeight:500 }}>
         {msg}
       </div>
     </div>
