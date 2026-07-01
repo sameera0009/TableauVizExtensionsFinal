@@ -6,6 +6,9 @@ import Kpiwithtrend from "./extensions/clearing/kpiwithtrend.jsx";
 import Ccashkpimain1 from "./extensions/Ccashkpimain1/Ccashkpimain1.jsx";
 import Topkpibar from "./extensions/clearing/Topkpibar.jsx";
 import Topbar from "./extensions/centralcash/Topbar.jsx";
+import Firstfivekpicards from "./extensions/centralcash/Firstfivekpicards.jsx";
+
+
 
 
 // Import pages
@@ -23,6 +26,7 @@ function App() {
         <Route path="/kpiwithtrend" element={<Kpiwithtrend />} />
         <Route path="/Topkpibar" element={<Topkpibar />} />
         <Route path="/Topbar" element={<Topbar />} />
+        <Route path="/Firstfivekpicards" element={<Firstfivekpicards />} />
         
         <Route path="/suspense-card" element={<ExtensionPlaceholder title="Suspense KPI Card" />} />
         <Route path="/kpi-card" element={<ExtensionPlaceholder title="KPI Card Pro" />} />
