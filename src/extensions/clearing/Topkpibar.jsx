@@ -79,7 +79,7 @@ async function readRows(ws) {
 
 /* STRICT key match: exact, wrapper-stripped exact, normalized exact only */
 function norm(s) { return s.toLowerCase().replace(/[^a-z0-9]/g, ""); }
-function inner(c) { return c.replace(/^(SUM|AVG|MIN|MAX|COUNT|ATTR|MEDIAN|STDEV|VAR)\((.+)\)$/i, "$2"); }
+function inner(c) { return c.replace(/^(SUM|AVG|MIN|MAX|COUNT|AGG|ATTR|MEDIAN|STDEV|VAR)\((.+)\)$/i, "$2"); }
 function keyFor(rows, name) {
   if (!rows.length) return null;
   const rk = Object.keys(rows[0]);
