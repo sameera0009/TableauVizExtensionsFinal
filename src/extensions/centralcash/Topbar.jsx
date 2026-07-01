@@ -75,6 +75,49 @@ async function fetchUser(ws) {
     return { name:g("user name","username","user","login"), role:g("user role","role","department","designation"), imageUrl:g("user image","image","photo","avatar") };
   } catch { return null; }
 }
+async function fetchNavConfig(ws) {
+  try {
+    const rdr = await ws.getSummaryDataReaderAsync(undefined, { ignoreSelection:true });
+    const pg  = await rdr.getPageAsync(0); 
+    await rdr.releaseAsync();
+    if (!pg.data.length) return null;
+    const keys = pg.columns.map((c) => c.fieldName);
+    const g = (...ns) => { 
+      const k = findField(keys,...ns); 
+      if(!k) return null; 
+      const i=keys.indexOf(k); 
+      return (pg.data[0][i]?.formattedValue||String(pg.data[0][i]?.nativeValue||"")).trim()||null; 
+    };
+    
+    // Get all possible page configs (up to 5 pages)
+    const pages = [];
+    for (let i = 1; i <= 5; i++) {
+      const header = g(`page${i}header`, `page${i} header`, `page${i}_header`);
+      const link = g(`page${i}link`, `page${i} link`, `page${i}_link`);
+      if (header || link) {
+        pages.push({
+          id: `page${i}`,
+          label: header || link || `Page ${i}`,
+          link: link || header || `#page${i}`
+        });
+      }
+    }
+    
+    const dashboardHeader = g("dashboard header", "dashboard_header", "dashboard", "header");
+    const defaultUser = g("default user", "default_user", "company", "org", "default");
+    
+    return {
+      dashboardHeader: dashboardHeader || "Cash Position Analyzer",
+      pages: pages.length > 0 ? pages : [
+        { id: "home", label: "Home", link: "#home" },
+        { id: "limits", label: "Limits", link: "#limits" },
+        { id: "position", label: "Position", link: "#position" }
+      ],
+      defaultUser: defaultUser || "ComBank"
+    };
+  } catch { return null; }
+}
+
 async function setParams(ws, level, selected) {
   if (!ws) return;
   try {
@@ -108,6 +151,15 @@ export default function CashPositionNavbar() {
   const [fpOpen, setFpOpen] = useState(false);
   const [page,   setPage]   = useState("home");
   const [user,   setUser]   = useState({ name:"", role:"", imageUrl:null, loaded:false });
+  const [navConfig, setNavConfig] = useState({ 
+    dashboardHeader: "Cash Position Analyzer", 
+    pages: [
+      { id: "home", label: "Home", link: "#home" },
+      { id: "limits", label: "Limits", link: "#limits" },
+      { id: "position", label: "Position", link: "#position" }
+    ],
+    defaultUser: "ComBank"
+  });
   const [logoErr,setLogoErr]= useState(false);
   const clk = useClock();
 
@@ -118,9 +170,16 @@ export default function CashPositionNavbar() {
         const ws = window.tableau.extensions.worksheetContent.worksheet;
         wsRef.current = ws;
         const load = async () => {
-          const [rows,u] = await Promise.all([fetchHierarchy(ws), fetchUser(ws)]);
+          const [rows, u, nav] = await Promise.all([
+            fetchHierarchy(ws), 
+            fetchUser(ws),
+            fetchNavConfig(ws)
+          ]);
           setMaps(buildMaps(rows));
           setUser(u ? {...u,loaded:true} : {name:"Treasury User",role:"Analyst",imageUrl:null,loaded:true});
+          if (nav) {
+            setNavConfig(nav);
+          }
         };
         ws.addEventListener(window.tableau.TableauEventType.SummaryDataChanged, load);
         await load();
@@ -136,6 +195,7 @@ export default function CashPositionNavbar() {
         ];
         setMaps(buildMaps(demo));
         setUser({name:"Treasury User",role:"Analyst",imageUrl:null,loaded:true});
+        // Keep default nav config for demo
       }
     }
     init();
@@ -176,7 +236,7 @@ export default function CashPositionNavbar() {
   const logoStyle   = { display:"flex", alignItems:"center", flexShrink:0, paddingRight:16, borderRight:"1px solid "+BDR_MID, height:34 };
   const titleStyle  = { display:"flex", flexDirection:"column", padding:"0 14px", flexShrink:0 };
   const vdivStyle   = { width:1, height:26, background:BDR_MID, flexShrink:0, margin:"0 4px" };
-  const navLinksStyle={ display:"flex", alignItems:"center", gap:1, padding:"0 12px", height:"100%" };
+  const navLinksStyle={ display:"flex", alignItems:"center", gap:1, padding:"0 12px", height:"100%", overflowX:"auto" };
 
   const navBtnStyle = (active) => ({ ...base, position:"relative", display:"flex", alignItems:"center", gap:5, height:34, padding:"0 12px", borderRadius:7, fontSize:12.5, fontWeight:active?600:500, color:active?RED:TEXT_MID, cursor:"pointer", border:"none", backgroundColor:active?RED_GLOW:"transparent", userSelect:"none", whiteSpace:"nowrap" });
 
@@ -233,12 +293,6 @@ export default function CashPositionNavbar() {
     </svg>
   );
 
-  const NAV_ITEMS = [
-    { id:"home",     label:"Home",     icon:<Ico d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" d2="M9 22V12h6v10"/> },
-    { id:"limits",   label:"Limits",   icon:<Ico d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/> },
-    { id:"position", label:"Position", icon:<Ico extra={<><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></>}/> },
-  ];
-
   return (
     <div style={{ width:"100%", height:"100%", backgroundColor:"transparent" }}>
       <nav style={navStyle}>
@@ -249,23 +303,38 @@ export default function CashPositionNavbar() {
         {/* Logo */}
         <div style={logoStyle}>
           {logoErr
-            ? <span style={{fontSize:15,fontWeight:700,color:RED}}>ComBank</span>
-            : <img height="26" src="https://www.combank.lk/assets/images/logo/newlogo.svg" alt="ComBank" style={{mixBlendMode:"multiply",filter:"contrast(1.08) saturate(1.1)"}} onError={()=>setLogoErr(true)} />
+            ? <span style={{fontSize:15,fontWeight:700,color:RED}}>{navConfig.defaultUser}</span>
+            : <img height="26" src="https://www.combank.lk/assets/images/logo/newlogo.svg" alt={navConfig.defaultUser} style={{mixBlendMode:"multiply",filter:"contrast(1.08) saturate(1.1)"}} onError={()=>setLogoErr(true)} />
           }
         </div>
 
-        {/* Title */}
+        {/* Title - Dynamic Dashboard Header */}
         <div style={titleStyle}>
-          <span style={{fontSize:13,fontWeight:600,color:TEXT,letterSpacing:"-.15px",whiteSpace:"nowrap"}}>Cash Position Analyzer</span>
+          <span style={{fontSize:13,fontWeight:600,color:TEXT,letterSpacing:"-.15px",whiteSpace:"nowrap"}}>{navConfig.dashboardHeader}</span>
         </div>
 
         <div style={vdivStyle} />
 
-        {/* Nav links */}
+        {/* Nav links - Dynamic from config */}
         <div style={navLinksStyle}>
-          {NAV_ITEMS.map(({id,label,icon}) => (
-            <button key={id} style={navBtnStyle(page===id)} onClick={()=>setPage(id)}>
-              {icon} {label}
+          {navConfig.pages.map(({id,label,link}) => (
+            <button 
+              key={id} 
+              style={navBtnStyle(page===id)} 
+              onClick={() => {
+                setPage(id);
+                // If it's an external link, open it
+                if (link.startsWith('http://') || link.startsWith('https://')) {
+                  window.open(link, '_blank');
+                } else if (link.startsWith('#')) {
+                  // Handle internal navigation
+                  // You can add routing logic here if needed
+                }
+              }}
+            >
+              <span style={{display:"flex",alignItems:"center",gap:5}}>
+                {label}
+              </span>
               {page===id && <div style={navUnderStyle} />}
             </button>
           ))}
