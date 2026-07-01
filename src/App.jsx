@@ -8,6 +8,7 @@ import Topkpibar from "./extensions/clearing/Topkpibar.jsx";
 import Topbar from "./extensions/centralcash/Topbar.jsx";
 import Firstfivekpicards from "./extensions/centralcash/Firstfivekpicards.jsx";
 import Mapviz from "./extensions/centralcash/Mapviz.jsx";
+import Drillbar from "./extensions/centralcash/Drillbar.jsx";
 
 
 
@@ -29,6 +30,7 @@ function App() {
         <Route path="/Topbar" element={<Topbar />} />
         <Route path="/Firstfivekpicards" element={<Firstfivekpicards />} />
         <Route path="/Mapviz" element={<Mapviz />} />
+        <Route path="/Drillbar" element={<Drillbar />} />
         
         <Route path="/suspense-card" element={<ExtensionPlaceholder title="Suspense KPI Card" />} />
         <Route path="/kpi-card" element={<ExtensionPlaceholder title="KPI Card Pro" />} />
