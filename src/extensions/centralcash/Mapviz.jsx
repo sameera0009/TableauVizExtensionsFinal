@@ -34,7 +34,7 @@ const C = {
 
 /* sequential color ramp (low → high): cool teal to warm amber to red */
 const RAMP = [
-  { t: 0.0, c: [45, 212, 191] },   // teal
+  { t: 0.0, c: [45, 212, 191] },    // teal
   { t: 0.35, c: [13, 148, 136] },  // deep teal
   { t: 0.6, c: [217, 119, 6] },    // amber
   { t: 0.8, c: [220, 38, 38] },    // red
@@ -186,17 +186,16 @@ function MapInner({ rows }) {
   const layerRef = useRef(null);
   const [ready, setReady] = useState(false);
   const [loadErr, setLoadErr] = useState(null);
+  
+  // "size" or "color" selector
+  const [scaleMode, setScaleMode] = useState("size"); 
 
   const keys = useMemo(() => ({
     lat: keyFor(rows, "map_lat"),
     lng: keyFor(rows, "map_lng"),
     val: keyFor(rows, "map_value"),
     label: keyFor(rows, "map_label"),
-    title: keyFor(rows, "chart_title"),
   }), [rows]);
-
-  let header = vStr(rows[0], keys.title);
-  header = header ? pretty(header) : "Geographic Distribution";
 
   /* parse points */
   const points = useMemo(() => {
@@ -230,7 +229,7 @@ function MapInner({ rows }) {
     return () => { cancelled = true; };
   }, []);
 
-  /* draw / redraw circles + auto-fit */
+  /* draw / redraw circles + auto-fit dependency added for [scaleMode] */
   useEffect(() => {
     if (!ready || !mapRef.current || !window.L) return;
     const L = window.L;
@@ -241,8 +240,11 @@ function MapInner({ rows }) {
     const latlngs = [];
     points.forEach((p) => {
       const t = (p.value - vMin) / range;
-      const color = rampColor(t);
-      const radius = 7 + t * 17; // 7–24 px by value
+      
+      // Determine logic metrics based on state swapper option selected
+      const color = scaleMode === "color" ? rampColor(t) : C.teal;
+      const radius = scaleMode === "size" ? (7 + t * 17) : 12; // Dynamic 7–24px or static unified size
+
       latlngs.push([p.lat, p.lng]);
       const marker = L.circleMarker([p.lat, p.lng], {
         radius, color: "#fff", weight: 1.5, fillColor: color, fillOpacity: 0.82,
@@ -267,7 +269,7 @@ function MapInner({ rows }) {
       mapRef.current.fitBounds(bounds, { padding: [36, 36], maxZoom: 14 });
     }
     setTimeout(() => mapRef.current && mapRef.current.invalidateSize(), 60);
-  }, [ready, points, vMin, range]);
+  }, [ready, points, vMin, range, scaleMode]);
 
   /* keep map sized to container */
   useEffect(() => {
@@ -284,28 +286,66 @@ function MapInner({ rows }) {
                   borderRadius:14, border:`1px solid ${C.line}`, boxShadow:"0 1px 3px rgba(15,28,46,.05),0 8px 24px rgba(15,28,46,.06)",
                   overflow:"hidden", position:"relative" }}>
 
-      {/* header */}
-      <div style={{ display:"flex", alignItems:"center", gap:10, padding:"13px 16px 11px", borderBottom:`1px solid ${C.line}`, flexShrink:0, zIndex:500 }}>
-        <div style={{ width:3, height:18, borderRadius:2, background:`linear-gradient(180deg,${C.tealLt},${C.tealDk})`, flexShrink:0 }} />
-        <div style={{ minWidth:0, flex:1 }}>
-          <div style={{ fontSize:13, fontWeight:700, color:C.ink, letterSpacing:"-.2px", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{header}</div>
-          <div style={{ fontSize:9.5, color:C.mut, marginTop:1 }}>{points.length} location{points.length === 1 ? "" : "s"}</div>
-        </div>
-      </div>
-
-      {/* map */}
+      {/* map layout workspace */}
       <div style={{ flex:1, minHeight:0, position:"relative" }}>
         <div ref={mapElRef} style={{ position:"absolute", inset:0 }} />
         {!points.length && ready && <NoPoints />}
         {!ready && !loadErr && <LoadingMap />}
 
-        {/* color legend */}
+        {/* FLOATING SCALE MODE SWAPPER & METADATA OVERLAY */}
+        {ready && points.length > 0 && (
+          <div style={{ position:"absolute", top:12, right:12, zIndex:500, display:"flex", flexDirection:"column", alignItems:"flex-end", gap:8 }}>
+            
+            {/* Animated Tab Control Box */}
+            <div style={{ background:"rgba(255, 255, 255, 0.9)", backdropFilter:"blur(12px)", padding:4, borderRadius:10, 
+                          border:`1px solid ${C.line}`, boxShadow:"0 4px 12px rgba(15,28,46,0.08)", display:"flex", gap:2 }}>
+              <button 
+                onClick={() => setScaleMode("size")}
+                style={{ border:"none", padding:"6px 12px", borderRadius:7, fontSize:11, fontWeight:600, cursor:"pointer",
+                         transition:"all 0.2s ease", display:"flex", alignItems:"center", gap:5,
+                         background: scaleMode === "size" ? C.ink : "transparent",
+                         color: scaleMode === "size" ? "#ffffff" : C.sub }}
+              >
+                <span style={{ fontSize:12 }}>📐</span> Size Scale
+              </button>
+              <button 
+                onClick={() => setScaleMode("color")}
+                style={{ border:"none", padding:"6px 12px", borderRadius:7, fontSize:11, fontWeight:600, cursor:"pointer",
+                         transition:"all 0.2s ease", display:"flex", alignItems:"center", gap:5,
+                         background: scaleMode === "color" ? C.ink : "transparent",
+                         color: scaleMode === "color" ? "#ffffff" : C.sub }}
+              >
+                <span style={{ fontSize:12 }}>🎨</span> Color Scale
+              </button>
+            </div>
+
+            {/* Context Location Count Tag */}
+            <div style={{ background:"rgba(11, 18, 32, 0.8)", backdropFilter:"blur(6px)", color:"#fff", fontSize:10, 
+                          padding:"4px 10px", borderRadius:20, fontWeight:500, boxShadow:"0 2px 6px rgba(0,0,0,0.15)" }}>
+              {points.length} Active location{points.length === 1 ? "" : "s"}
+            </div>
+          </div>
+        )}
+
+        {/* DYNAMIC LEGEND CONFIGURATION */}
         {points.length > 0 && (
           <div style={{ position:"absolute", bottom:12, left:12, zIndex:500, background:"rgba(255,255,255,.94)", backdropFilter:"blur(8px)",
-                        borderRadius:9, border:`1px solid ${C.line}`, boxShadow:"0 2px 10px rgba(15,28,46,.1)", padding:"8px 10px" }}>
-            <div style={{ fontSize:8.5, fontWeight:700, letterSpacing:".06em", textTransform:"uppercase", color:C.mut, marginBottom:5 }}>Value</div>
-            <div style={{ width:120, height:8, borderRadius:5, background:`linear-gradient(90deg, ${rampColor(0)}, ${rampColor(0.35)}, ${rampColor(0.6)}, ${rampColor(0.8)}, ${rampColor(1)})` }} />
-            <div style={{ display:"flex", justifyContent:"space-between", marginTop:3 }}>
+                        borderRadius:9, border:`1px solid ${C.line}`, boxShadow:"0 2px 10px rgba(15,28,46,.1)", padding:"8px 12px", minWidth:120 }}>
+            <div style={{ fontSize:8.5, fontWeight:700, letterSpacing:".06em", textTransform:"uppercase", color:C.mut, marginBottom:6 }}>
+              {scaleMode === "size" ? "Scale: Radius Size" : "Scale: Color Spectrum"}
+            </div>
+            
+            {scaleMode === "color" ? (
+              <div style={{ width:120, height:8, borderRadius:5, background:`linear-gradient(90deg, ${rampColor(0)}, ${rampColor(0.35)}, ${rampColor(0.6)}, ${rampColor(0.8)}, ${rampColor(1)})` }} />
+            ) : (
+              <div style={{ display:"flex", alignItems:"center", gap:6, height:8, padding:"0 2px" }}>
+                <div style={{ width:4, height:4, borderRadius:"50%", background:C.teal }} />
+                <div style={{ flex:1, height:1, background:C.faint }} />
+                <div style={{ width:10, height:10, borderRadius:"50%", background:C.teal }} />
+              </div>
+            )}
+
+            <div style={{ display:"flex", justifyContent:"space-between", marginTop:5 }}>
               <span style={{ fontSize:8, color:C.sub, fontFamily:"ui-monospace,monospace" }}>{fmtN(vMin)}</span>
               <span style={{ fontSize:8, color:C.sub, fontFamily:"ui-monospace,monospace" }}>{fmtN(vMax)}</span>
             </div>
@@ -329,7 +369,7 @@ function NoPoints() {
       </svg>
       <span style={{ fontSize:11, color:C.mut, textAlign:"center", lineHeight:1.5, padding:"0 16px" }}>
         Drop fields on <b>Detail</b>:<br/>
-        <span style={{ fontSize:9, color:C.faint }}>map_lat, map_lng, map_value, map_label, chart_title</span>
+        <span style={{ fontSize:9, color:C.faint }}>map_lat, map_lng, map_value, map_label</span>
       </span>
     </div>
   );
@@ -344,7 +384,6 @@ function LoadingMap() {
 function Skeleton() {
   return (
     <div style={{ width:"100%", height:"100%", background:C.bg, borderRadius:14, border:`1px solid ${C.line}`, padding:16, display:"flex", flexDirection:"column", gap:10 }}>
-      <div style={{ height:18, width:180, borderRadius:5, background:"linear-gradient(90deg,#f1f5f9 25%,#e2e8f0 50%,#f1f5f9 75%)", backgroundSize:"200% 100%", animation:"mpShim 1.4s infinite" }} />
       <div style={{ flex:1, borderRadius:8, background:"linear-gradient(90deg,#f1f5f9 25%,#e2e8f0 50%,#f1f5f9 75%)", backgroundSize:"200% 100%", animation:"mpShim 1.4s infinite" }} />
     </div>
   );
