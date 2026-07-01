@@ -195,7 +195,7 @@ function MapInner({ rows }) {
     title: keyFor(rows, "chart_title"),
   }), [rows]);
 
-  let header = vStr(rows[0], keys.title);
+  
   header = header ? pretty(header) : "Geographic Distribution";
 
   /* parse points */
