@@ -168,8 +168,8 @@ export default function CashPositionAnalyzer() {
               defaultUser: first.defaultUser || "ComBank"
             });
             setUser({
-              name: first.userName || "Treasury User",
-              role: first.userRole || "Analyst",
+              name: first.userName || "",
+              role: first.userRole || "",
               imageUrl: first.userImage || null,
               loaded: true
             });
@@ -190,7 +190,7 @@ export default function CashPositionAnalyzer() {
           { agm: "AGM West", region: "Sabaragamuwa", branch: "Ratnapura" },
         ];
         setMaps(buildMaps(demo));
-        setUser({ name: "Treasury User", role: "Analyst", imageUrl: null, loaded: true });
+        setUser({ name: "", role: "", imageUrl: null, loaded: true });
       }
     }
     init();
