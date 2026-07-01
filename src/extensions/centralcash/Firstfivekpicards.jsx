@@ -1,39 +1,40 @@
-import { useEffect, useRef, useState, useMemo } from "react";
+import { useEffect, useRef, useState } from "react";
 
 /* ═══════════════════════════════════════════════════════════
-   HERO CARDS — single-file React Viz Extension
-   5 pure-white rounded cards on a transparent background.
-   Card 1 is DOUBLE (2 cols x 2 rows). Cards 2-5 are single.
-   Each card: dynamic header · hero amount (auto Mn/Bn) ·
-   delta vs last working day (colored arrow) · trend line.
+   CASH POSITION CARDS — single-file React Viz Extension
+   Big Total LCEY (2x2) + 5 LKR category cards (icons) +
+   3 major-currency cards (flags). Pure-white rounded cards on a
+   transparent background. Each card: dynamic header · auto-unit
+   hero · delta vs last working day (colored arrow) · trend line.
+   Sized for a ~1300px dashboard, responsive.
 
-   Fields (drop ALL on Detail, per-card, matched by name):
-     cardN_header (string)  — dynamic header
-     cardN_hero   (numeric) — hero amount
-     cardN_delta  (numeric) — vs last working day
-     cardN_value  (numeric) — trend series
-     cardN_date   (date)    — trend x-axis (optional)
-   where N = 1..5
+   Fields (drop ALL on Detail, per card, matched by name):
+     <key>_hero   (numeric) — big amount (auto Mn/Bn/Tn)
+     <key>_delta  (numeric) — vs last working day
+     <key>_value  (numeric) — trend series
+     <key>_date   (date)    — trend x-axis (optional)
+     <key>_header (string)  — header override (optional)
+   keys: lcey, coh, cit, atm, crm, cdm, usd, eur, gbp
 ═══════════════════════════════════════════════════════════ */
 
-if (typeof window !== "undefined" && !document.getElementById("hc-kf")) {
+if (typeof window !== "undefined" && !document.getElementById("cc-kf")) {
   const s = document.createElement("style");
-  s.id = "hc-kf";
+  s.id = "cc-kf";
   s.innerHTML =
-    "@keyframes hcShim{0%{background-position:200% 0}100%{background-position:-200% 0}}" +
-    "@keyframes hcIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}";
+    "@keyframes ccShim{0%{background-position:200% 0}100%{background-position:-200% 0}}" +
+    "@keyframes ccIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}";
   document.head.appendChild(s);
 }
 
 const C = {
   ink: "#0b1220", sub: "#475569", mut: "#94a3b8", faint: "#cbd5e1",
-  bg: "#ffffff", line: "#e8ebf0", track: "#eef2f6",
-  teal: "#0d9488", tealLt: "#2dd4bf", tealDk: "#0f766e",
+  bg: "#ffffff", line: "#e8ebf0",
+  teal: "#0d9488", tealLt: "#2dd4bf", tealDk: "#0f766e", tealBg: "rgba(13,148,136,.08)",
   green: "#16a34a", greenGlow: "rgba(22,163,74,.10)",
   red: "#dc2626", redGlow: "rgba(220,38,38,.10)",
 };
 
-/* ── auto-unit hero formatter ── */
+/* ── formatters ── */
 function fmtHero(n) {
   if (n == null || isNaN(n)) return { num: "—", unit: "" };
   const a = Math.abs(n), s = n < 0 ? "-" : "";
@@ -107,9 +108,67 @@ function parseDate(dv) {
 }
 
 /* ════════════════════════════════
+   ICONS  (stroke, 24x24)
+════════════════════════════════ */
+const Icon = {
+  bank: (p) => <g {...p}><path d="M3 21h18M4 21V10m4 11V10m8 11V10m4 11V10M12 3 3 8h18l-9-5Z"/></g>,          // LCEY
+  wallet: (p) => <g {...p}><path d="M3 7h16a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a1 1 0 0 1 1-1h13"/><circle cx="17" cy="13" r="1.3"/></g>, // Cash on Hand
+  truck: (p) => <g {...p}><path d="M1 4h13v11H1zM14 8h4l3 3v4h-7"/><circle cx="6" cy="18" r="1.8"/><circle cx="17.5" cy="18" r="1.8"/></g>, // In Transit
+  atm: (p) => <g {...p}><rect x="4" y="3" width="16" height="14" rx="1.5"/><path d="M8 21h8M9 7h6M9 11h4"/></g>,   // ATM
+  recycle: (p) => <g {...p}><path d="M7 19H4l3-5m10 5 2-3-5 1M12 4l3 5-6 0m8-1 1.5 3M6.5 9 5 6"/></g>,          // CRM
+  deposit: (p) => <g {...p}><path d="M12 3v9m0 0 4-4m-4 4-4-4M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></g>,   // CDM
+};
+
+/* ── simple SVG flags (render on Windows unlike emoji) ── */
+function FlagUSD() {
+  return (
+    <svg width="26" height="18" viewBox="0 0 26 18" style={{ borderRadius:3, display:"block", boxShadow:"0 0 0 1px rgba(0,0,0,.06)" }}>
+      {[0,1,2,3,4,5,6].map((i) => <rect key={i} x="0" y={i * (18/7)} width="26" height={18/7} fill={i % 2 ? "#fff" : "#b22234"} />)}
+      <rect x="0" y="0" width="11" height={18/7*4} fill="#3c3b6e" />
+      {[...Array(6)].map((_, i) => <circle key={i} cx={2 + (i % 3) * 3.5} cy={2 + Math.floor(i / 3) * 4} r="0.7" fill="#fff" />)}
+    </svg>
+  );
+}
+function FlagEUR() {
+  return (
+    <svg width="26" height="18" viewBox="0 0 26 18" style={{ borderRadius:3, display:"block", boxShadow:"0 0 0 1px rgba(0,0,0,.06)" }}>
+      <rect width="26" height="18" fill="#003399" />
+      {[...Array(12)].map((_, i) => {
+        const ang = (i / 12) * Math.PI * 2 - Math.PI / 2;
+        return <circle key={i} cx={13 + Math.cos(ang) * 5.5} cy={9 + Math.sin(ang) * 5.5} r="0.9" fill="#ffcc00" />;
+      })}
+    </svg>
+  );
+}
+function FlagGBP() {
+  return (
+    <svg width="26" height="18" viewBox="0 0 26 18" style={{ borderRadius:3, display:"block", boxShadow:"0 0 0 1px rgba(0,0,0,.06)" }}>
+      <rect width="26" height="18" fill="#012169" />
+      <path d="M0 0 26 18M26 0 0 18" stroke="#fff" strokeWidth="3.5" />
+      <path d="M0 0 26 18M26 0 0 18" stroke="#c8102e" strokeWidth="1.8" />
+      <path d="M13 0V18M0 9H26" stroke="#fff" strokeWidth="5" />
+      <path d="M13 0V18M0 9H26" stroke="#c8102e" strokeWidth="2.6" />
+    </svg>
+  );
+}
+
+/* card definitions */
+const CARDS = [
+  { key: "lcey", label: "Total LCEY",     icon: "bank",    big: true },
+  { key: "coh",  label: "Cash on Hand",   icon: "wallet"  },
+  { key: "cit",  label: "Cash in Transit",icon: "truck"   },
+  { key: "atm",  label: "ATM Cash",       icon: "atm"     },
+  { key: "crm",  label: "CRM Cash",       icon: "recycle" },
+  { key: "cdm",  label: "CDM Cash",       icon: "deposit" },
+  { key: "usd",  label: "USD", flag: "USD" },
+  { key: "eur",  label: "EUR", flag: "EUR" },
+  { key: "gbp",  label: "GBP", flag: "GBP" },
+];
+
+/* ════════════════════════════════
    ROOT
 ════════════════════════════════ */
-export default function HeroCards() {
+export default function CashCards() {
   const [state, setState] = useState({ loading: true, error: null, rows: [] });
 
   useEffect(() => {
@@ -146,71 +205,63 @@ function Shell({ children }) {
 }
 
 /* ════════════════════════════════
-   GRID  — card1 spans 2x2
+   GRID
 ════════════════════════════════ */
 function Grid({ rows }) {
   const wrapRef = useRef(null);
-  const [narrow, setNarrow] = useState(false);
+  const [cols, setCols] = useState(6);
 
   useEffect(() => {
     if (!wrapRef.current) return;
-    const ro = new ResizeObserver((e) => setNarrow(e[0].contentRect.width < 560));
+    const ro = new ResizeObserver((e) => {
+      const w = e[0].contentRect.width;
+      setCols(w >= 1080 ? 6 : w >= 720 ? 4 : 2);
+    });
     ro.observe(wrapRef.current);
     return () => ro.disconnect();
   }, []);
 
-  const card = (p) => {
-    const hk = keyFor(rows, p + "_header");
-    const hr = keyFor(rows, p + "_hero");
-    const dk = keyFor(rows, p + "_delta");
-    const vk = keyFor(rows, p + "_value");
-    const tk = keyFor(rows, p + "_date");
-    let header = vStr(rows[0], hk);
-    header = header ? pretty(header) : pretty(p);
-    /* hero: sum across rows */
+  const build = (key) => {
+    const hk = keyFor(rows, key + "_header");
+    const hr = keyFor(rows, key + "_hero");
+    const dk = keyFor(rows, key + "_delta");
+    const vk = keyFor(rows, key + "_value");
+    const tk = keyFor(rows, key + "_date");
+    const headerOverride = vStr(rows[0], hk);
     let hero = null;
     if (hr) { let s = 0, c = 0; rows.forEach((r) => { const v = vNum(r, hr); if (v != null) { s += v; c++; } }); if (c) hero = s; }
-    /* delta: first row (pre-computed) */
     const delta = vNum(rows[0], dk);
-    /* trend series */
     let pts = [];
     rows.forEach((r) => { const v = vNum(r, vk); if (v == null) return; pts.push({ v, d: tk ? parseDate(r[tk]) : null }); });
     if (pts.length && pts[0].d) pts.sort((a, b) => (a.d?.getTime() || 0) - (b.d?.getTime() || 0));
-    return { header, hero, delta, pts: pts.map((x) => x.v), has: !!(hr || hk || vk) };
+    return { hero, delta, pts: pts.map((x) => x.v), headerOverride, has: !!(hr || vk) };
   };
 
-  const c1 = card("card1");
-  const rest = [card("card2"), card("card3"), card("card4"), card("card5")];
+  /* grid template: LCEY spans 2x2; rest fill remaining cells */
+  const gridStyle = {
+    display: "grid", width: "100%", height: "100%", gap: 10, boxSizing: "border-box",
+    gridTemplateColumns: `repeat(${cols}, 1fr)`,
+    gridTemplateRows: cols === 6 ? "1fr 1fr" : cols === 4 ? "1fr 1fr 1fr" : "auto",
+    gridAutoRows: cols === 2 ? "minmax(120px, 1fr)" : undefined,
+  };
 
-  /* grid: 4 cols x 2 rows on wide. card1 spans col1-2 / row1-2.
-     rest fill: c2 (col3,row1), c3 (col4,row1), c4 (col3,row2), c5 (col4,row2) */
   return (
     <div ref={wrapRef} style={{ width:"100%", height:"100%" }}>
-      {narrow ? (
-        /* stacked: big card on top full width, then 2x2 of the rest */
-        <div style={{ display:"flex", flexDirection:"column", gap:8, height:"100%" }}>
-          <div style={{ flex:"2 1 0", minHeight:0 }}>
-            <Card d={c1} big idx={0} />
-          </div>
-          <div style={{ flex:"2 1 0", display:"grid", gridTemplateColumns:"1fr 1fr", gridTemplateRows:"1fr 1fr", gap:8, minHeight:0 }}>
-            {rest.map((d, i) => <Card key={i} d={d} idx={i + 1} />)}
-          </div>
-        </div>
-      ) : (
-        <div style={{
-          display:"grid", width:"100%", height:"100%",
-          gridTemplateColumns:"1fr 1fr 1fr 1fr", gridTemplateRows:"1fr 1fr", gap:8,
-        }}>
-          <div style={{ gridColumn:"1 / 3", gridRow:"1 / 3", minWidth:0, minHeight:0 }}>
-            <Card d={c1} big idx={0} />
-          </div>
-          {rest.map((d, i) => (
-            <div key={i} style={{ minWidth:0, minHeight:0 }}>
-              <Card d={d} idx={i + 1} />
+      <div style={gridStyle}>
+        {CARDS.map((cfg, i) => {
+          const d = build(cfg.key);
+          const span = cfg.big
+            ? (cols === 2
+                ? { gridColumn: "1 / 3", gridRow: "1 / 2", minHeight: 180 }
+                : { gridColumn: "1 / 3", gridRow: "1 / 3" })
+            : {};
+          return (
+            <div key={cfg.key} style={{ minWidth:0, minHeight:0, ...span }}>
+              <Card cfg={cfg} d={d} idx={i} />
             </div>
-          ))}
-        </div>
-      )}
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -218,7 +269,8 @@ function Grid({ rows }) {
 /* ════════════════════════════════
    CARD
 ════════════════════════════════ */
-function Card({ d, big, idx }) {
+function Card({ cfg, d, idx }) {
+  const big = !!cfg.big;
   const svgRef = useRef(null);
   const valsKey = d.pts.join(",");
 
@@ -227,8 +279,7 @@ function Card({ d, big, idx }) {
     buildSpark(svgRef.current, d.pts, big);
   }, [valsKey, big]); // eslint-disable-line
 
-  if (!d.has) return <Placeholder big={big} />;
-
+  const header = d.headerOverride ? pretty(d.headerOverride) : cfg.label;
   const hero = fmtHero(d.hero);
   const dPos = d.delta != null ? d.delta >= 0 : null;
   const dColor = dPos === true ? C.green : dPos === false ? C.red : C.mut;
@@ -237,46 +288,51 @@ function Card({ d, big, idx }) {
   return (
     <div style={{
       width:"100%", height:"100%", boxSizing:"border-box", background:C.bg,
-      borderRadius: big ? 18 : 14, border:`1px solid ${C.line}`,
-      boxShadow: big ? "0 2px 10px rgba(15,28,46,.06),0 8px 28px rgba(15,28,46,.06)" : "0 1px 4px rgba(15,28,46,.05)",
-      padding: big ? "18px 20px 14px" : "13px 14px 10px",
+      borderRadius: big ? 20 : 16, border:`1px solid ${C.line}`,
+      boxShadow: big ? "0 2px 12px rgba(15,28,46,.06),0 10px 30px rgba(15,28,46,.06)" : "0 1px 5px rgba(15,28,46,.05)",
+      padding: big ? "20px 22px 16px" : "14px 15px 11px",
       display:"flex", flexDirection:"column", overflow:"hidden",
-      animation:`hcIn .45s cubic-bezier(.16,1,.3,1) ${idx * 0.05}s both`,
+      animation:`ccIn .45s cubic-bezier(.16,1,.3,1) ${idx * 0.04}s both`,
     }}>
-      {/* header */}
-      <div style={{ fontSize: big ? 11 : 9.5, fontWeight:700, letterSpacing:".06em", textTransform:"uppercase",
-                    color:C.mut, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", marginBottom: big ? 10 : 6 }}>
-        {d.header}
+      {/* header row: icon/flag + title */}
+      <div style={{ display:"flex", alignItems:"center", gap: big ? 9 : 7, marginBottom: big ? 12 : 7 }}>
+        <span style={{ flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center",
+                       width: big ? 30 : 22, height: big ? 30 : 22, borderRadius: big ? 9 : 7,
+                       background: cfg.flag ? "transparent" : C.tealBg }}>
+          {cfg.flag
+            ? (cfg.flag === "USD" ? <FlagUSD /> : cfg.flag === "EUR" ? <FlagEUR /> : <FlagGBP />)
+            : <svg width={big ? 17 : 13} height={big ? 17 : 13} viewBox="0 0 24 24" fill="none" stroke={C.teal} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{Icon[cfg.icon]({})}</svg>
+          }
+        </span>
+        <span style={{ fontSize: big ? 12 : 9.5, fontWeight:700, letterSpacing:".05em", textTransform:"uppercase",
+                       color:C.mut, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{header}</span>
       </div>
 
       {/* hero */}
       <div style={{ display:"flex", alignItems:"baseline", gap: big ? 8 : 5, flexWrap:"wrap" }}>
-        <span style={{ fontSize: big ? 46 : 24, fontWeight:800, color:C.ink, letterSpacing:"-.04em", lineHeight:1,
+        <span style={{ fontSize: big ? 48 : 25, fontWeight:800, color:C.ink, letterSpacing:"-.045em", lineHeight:1,
                        fontVariantNumeric:"tabular-nums", fontFamily:"ui-monospace,SFMono-Regular,Menlo,monospace" }}>
           {hero.num}
         </span>
-        {hero.unit && (
-          <span style={{ fontSize: big ? 18 : 11, fontWeight:600, color:C.mut, letterSpacing:".02em" }}>{hero.unit}</span>
-        )}
+        {hero.unit && <span style={{ fontSize: big ? 19 : 11, fontWeight:600, color:C.mut }}>{hero.unit}</span>}
       </div>
 
       {/* delta */}
       {d.delta != null && (
-        <div style={{ display:"inline-flex", alignItems:"center", gap:4, marginTop: big ? 10 : 6, alignSelf:"flex-start",
-                      padding: big ? "3px 10px" : "2px 7px", borderRadius:20, background:dGlow }}>
-          <svg width={big ? 13 : 11} height={big ? 13 : 11} viewBox="0 0 24 24" fill="none" stroke={dColor}
-               strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+        <div style={{ display:"inline-flex", alignItems:"center", gap:4, marginTop: big ? 11 : 6, alignSelf:"flex-start",
+                      padding: big ? "4px 11px" : "2px 8px", borderRadius:20, background:dGlow }}>
+          <svg width={big ? 13 : 11} height={big ? 13 : 11} viewBox="0 0 24 24" fill="none" stroke={dColor} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
             <polyline points={dPos ? "18 15 12 9 6 15" : "6 9 12 15 18 9"} />
           </svg>
           <span style={{ fontSize: big ? 13 : 10.5, fontWeight:700, color:dColor, fontVariantNumeric:"tabular-nums" }}>{fmtDelta(d.delta)}</span>
-          <span style={{ fontSize: big ? 9.5 : 8, fontWeight:500, color:C.mut, marginLeft:2 }}>vs last day</span>
+          <span style={{ fontSize: big ? 10 : 8, fontWeight:500, color:C.mut, marginLeft:2 }}>vs last day</span>
         </div>
       )}
 
-      {/* trend line */}
-      <div style={{ flex:1, minHeight: big ? 60 : 30, marginTop:"auto", paddingTop: big ? 10 : 6, display:"flex", alignItems:"flex-end" }}>
-        <svg ref={svgRef} viewBox={`0 0 240 ${big ? 70 : 40}`} preserveAspectRatio="none"
-             style={{ width:"100%", height: big ? 70 : 40, display:"block", overflow:"visible" }} />
+      {/* trend line pinned to bottom */}
+      <div style={{ flex:1, minHeight: big ? 70 : 30, marginTop:"auto", paddingTop: big ? 12 : 6, display:"flex", alignItems:"flex-end" }}>
+        <svg ref={svgRef} viewBox={`0 0 240 ${big ? 80 : 40}`} preserveAspectRatio="none"
+             style={{ width:"100%", height: big ? 80 : 40, display:"block", overflow:"visible" }} />
       </div>
     </div>
   );
@@ -287,7 +343,7 @@ function buildSpark(svg, values, big) {
   svg.innerHTML = "";
   if (values.length < 2) return;
   const ns = "http://www.w3.org/2000/svg";
-  const W = 240, H = big ? 70 : 40, pad = 5;
+  const W = 240, H = big ? 80 : 40, pad = 5;
   const min = Math.min(...values), max = Math.max(...values), rng = max - min || 1, n = values.length;
   const toY = (v) => pad + (1 - (v - min) / rng) * (H - pad * 2);
   const pts = values.map((v, i) => ({ x: (i / (n - 1)) * W, y: toY(v) }));
@@ -301,36 +357,28 @@ function buildSpark(svg, values, big) {
   };
   const mk = (t, a) => { const e = document.createElementNS(ns, t); Object.entries(a).forEach(([k, v]) => e.setAttribute(k, v)); return e; };
   const defs = mk("defs", {});
-  const gid = "hcF" + Math.random().toString(36).slice(2, 7);
+  const gid = "ccF" + Math.random().toString(36).slice(2, 7);
   const g = mk("linearGradient", { id: gid, x1: "0", y1: "0", x2: "0", y2: "1" });
-  g.append(mk("stop", { offset: "0%", "stop-color": C.tealLt, "stop-opacity": ".26" }), mk("stop", { offset: "100%", "stop-color": C.teal, "stop-opacity": "0" }));
+  g.append(mk("stop", { offset: "0%", "stop-color": C.tealLt, "stop-opacity": ".28" }), mk("stop", { offset: "100%", "stop-color": C.teal, "stop-opacity": "0" }));
   defs.append(g); svg.appendChild(defs);
   const d = bez(pts);
   svg.appendChild(mk("path", { d: `${d} L ${pts[n-1].x} ${H} L ${pts[0].x} ${H} Z`, fill: `url(#${gid})` }));
-  const line = mk("path", { d, fill: "none", stroke: C.teal, "stroke-width": big ? "2.4" : "1.9", "stroke-linecap": "round", "stroke-linejoin": "round", "stroke-dasharray": "600", "stroke-dashoffset": "600" });
+  const line = mk("path", { d, fill: "none", stroke: C.teal, "stroke-width": big ? "2.5" : "1.9", "stroke-linecap": "round", "stroke-linejoin": "round", "stroke-dasharray": "700", "stroke-dashoffset": "700" });
   svg.appendChild(line);
-  requestAnimationFrame(() => { line.style.transition = "stroke-dashoffset 1s cubic-bezier(.16,1,.3,1)"; line.setAttribute("stroke-dashoffset", "0"); });
+  requestAnimationFrame(() => { line.style.transition = "stroke-dashoffset 1.1s cubic-bezier(.16,1,.3,1)"; line.setAttribute("stroke-dashoffset", "0"); });
   const lp = pts[n - 1];
-  const dot = mk("circle", { cx: lp.x, cy: lp.y, r: big ? "3.4" : "2.8", fill: C.teal, stroke: "#fff", "stroke-width": big ? "2" : "1.6" });
-  dot.style.opacity = "0"; dot.style.transition = "opacity .3s .7s"; svg.appendChild(dot);
+  const dot = mk("circle", { cx: lp.x, cy: lp.y, r: big ? "3.6" : "2.8", fill: C.tealDk, stroke: "#fff", "stroke-width": big ? "2" : "1.6" });
+  dot.style.opacity = "0"; dot.style.transition = "opacity .3s .8s"; svg.appendChild(dot);
   requestAnimationFrame(() => { dot.style.opacity = "1"; });
 }
 
 /* ── states ── */
-function Placeholder({ big }) {
-  return (
-    <div style={{ width:"100%", height:"100%", boxSizing:"border-box", background:C.bg, borderRadius: big ? 18 : 14,
-                  border:`1px dashed ${C.line}`, display:"flex", alignItems:"center", justifyContent:"center", padding:12 }}>
-      <span style={{ fontSize: big ? 10 : 8.5, color:C.faint, textAlign:"center" }}>drop cardN_* fields</span>
-    </div>
-  );
-}
 function Skeleton() {
   return (
-    <div style={{ width:"100%", height:"100%", display:"grid", gridTemplateColumns:"1fr 1fr 1fr 1fr", gridTemplateRows:"1fr 1fr", gap:8 }}>
-      <div style={{ gridColumn:"1 / 3", gridRow:"1 / 3", borderRadius:18, background:"linear-gradient(90deg,#f1f5f9 25%,#e2e8f0 50%,#f1f5f9 75%)", backgroundSize:"200% 100%", animation:"hcShim 1.4s infinite" }} />
-      {[0,1,2,3].map((i) => (
-        <div key={i} style={{ borderRadius:14, background:"linear-gradient(90deg,#f1f5f9 25%,#e2e8f0 50%,#f1f5f9 75%)", backgroundSize:"200% 100%", animation:"hcShim 1.4s infinite" }} />
+    <div style={{ width:"100%", height:"100%", display:"grid", gridTemplateColumns:"repeat(6,1fr)", gridTemplateRows:"1fr 1fr", gap:10 }}>
+      <div style={{ gridColumn:"1 / 3", gridRow:"1 / 3", borderRadius:20, background:"linear-gradient(90deg,#f1f5f9 25%,#e2e8f0 50%,#f1f5f9 75%)", backgroundSize:"200% 100%", animation:"ccShim 1.4s infinite" }} />
+      {[...Array(8)].map((_, i) => (
+        <div key={i} style={{ borderRadius:16, background:"linear-gradient(90deg,#f1f5f9 25%,#e2e8f0 50%,#f1f5f9 75%)", backgroundSize:"200% 100%", animation:"ccShim 1.4s infinite" }} />
       ))}
     </div>
   );
