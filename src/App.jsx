@@ -9,7 +9,7 @@ import Topbar from "./extensions/centralcash/Topbar.jsx";
 import Firstfivekpicards from "./extensions/centralcash/Firstfivekpicards.jsx";
 import Mapviz from "./extensions/centralcash/Mapviz.jsx";
 import Drillbar from "./extensions/clearing/Drillbar.jsx";
-import Drillbarccash from "./extensions/clearing/Drillbarccash.jsx";
+import Drillbarccash from "./extensions/centralcash/Drillbarccash.jsx";
 
 
 
