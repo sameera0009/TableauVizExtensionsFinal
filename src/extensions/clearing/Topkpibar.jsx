@@ -57,7 +57,7 @@ function fmtSignPct(n) {
 }
 function pretty(s) {
   if (!s) return "";
-  return s.replace(/^(SUM|AVG|MIN|MAX|COUNT|ATTR)\((.+)\)$/i, "$2")
+  return s.replace(/^(SUM|AVG|MIN|MAX|COUNT|DAY|ATTR)\((.+)\)$/i, "$2")
           .replace(/[_-]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()).trim();
 }
 
@@ -79,7 +79,7 @@ async function readRows(ws) {
 
 /* STRICT key match: exact, wrapper-stripped exact, normalized exact only */
 function norm(s) { return s.toLowerCase().replace(/[^a-z0-9]/g, ""); }
-function inner(c) { return c.replace(/^(SUM|AVG|MIN|MAX|COUNT|AGG|ATTR|MEDIAN|STDEV|VAR)\((.+)\)$/i, "$2"); }
+function inner(c) { return c.replace(/^(SUM|AVG|MIN|MAX|COUNT|AGG|ATTR|MEDIAN|DAY|STDEV|VAR)\((.+)\)$/i, "$2"); }
 function keyFor(rows, name) {
   if (!rows.length) return null;
   const rk = Object.keys(rows[0]);
