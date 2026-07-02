@@ -10,6 +10,7 @@ import Firstfivekpicards from "./extensions/centralcash/Firstfivekpicards.jsx";
 import Mapviz from "./extensions/centralcash/Mapviz.jsx";
 import Drillbar from "./extensions/clearing/Drillbar.jsx";
 import Drillbarccash from "./extensions/centralcash/Drillbarccash.jsx";
+import Donutpro from "./extensions/clearing/Donutpro.jsx";
 
 
 
@@ -32,6 +33,7 @@ function App() {
         <Route path="/Mapviz" element={<Mapviz />} />
         <Route path="/Drillbar" element={<Drillbar />} />
         <Route path="/Drillbarccash" element={<Drillbarccash />} />
+        <Route path="/Donutpro" element={<Donutpro />} />
         
         <Route path="/suspense-card" element={<ExtensionPlaceholder title="Suspense KPI Card" />} />
         <Route path="/kpi-card" element={<ExtensionPlaceholder title="KPI Card Pro" />} />
